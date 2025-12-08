@@ -4,6 +4,21 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+from io import BytesIO
+from datetime import datetime
+
+# For PDF export
+try:
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle, Image
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    import plotly.io as pio
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
 
 # Page configuration
 st.set_page_config(
@@ -121,6 +136,391 @@ def load_data():
                 pass
     
     return df
+
+# Function to create PDF export
+def create_pdf_report(df_export, selected_countries_list):
+    """Create a comprehensive PDF report with all tabs"""
+   
+    if not PDF_AVAILABLE:
+        return None
+   
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        topMargin=0.75*inch,
+        bottomMargin=0.75*inch,
+        leftMargin=0.75*inch,
+        rightMargin=0.75*inch
+    )
+    styles = getSampleStyleSheet()
+    story = []
+   
+    # Brand colors
+    cobalt = colors.HexColor('#175CFF')
+    denim = colors.HexColor('#0A083B')
+    light_denim = colors.HexColor('#57586E')
+    white = colors.white
+    sky = colors.HexColor('#52C4FF')
+    carrot = colors.HexColor('#FF8030')
+    canary = colors.HexColor('#FFD61A')
+    dark_ash = colors.HexColor('#999999')
+    cloud = colors.HexColor('#E8E8E8')
+   
+    # Custom styles with Neurial Grotesk (fallback to Helvetica)
+    # H1 - 60pt Bold
+    h1_style = ParagraphStyle(
+        'H1',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=60,
+        leading=68,
+        textColor=denim,
+        spaceAfter=30,
+        alignment=TA_CENTER
+    )
+   
+    # H2 - 50pt Medium
+    h2_style = ParagraphStyle(
+        'H2',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=50,
+        leading=56,
+        textColor=denim,
+        spaceAfter=24,
+        spaceBefore=24
+    )
+   
+    # H3 - 40pt Medium
+    h3_style = ParagraphStyle(
+        'H3',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=40,
+        leading=48,
+        textColor=denim,
+        spaceAfter=20,
+        spaceBefore=20
+    )
+   
+    # H4 - 24pt Medium
+    h4_style = ParagraphStyle(
+        'H4',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        leading=28,
+        textColor=denim,
+        spaceAfter=16,
+        spaceBefore=16
+    )
+   
+    # H5 - 20pt Bold
+    h5_style = ParagraphStyle(
+        'H5',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        leading=26,
+        textColor=cobalt,
+        spaceAfter=12,
+        spaceBefore=12
+    )
+   
+    # H6 - 11pt Bold
+    h6_style = ParagraphStyle(
+        'H6',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=13,
+        textColor=dark_ash,
+        spaceAfter=8
+    )
+   
+    # Body text - 15pt
+    body_style = ParagraphStyle(
+        'Body',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=15,
+        leading=22,
+        textColor=light_denim
+    )
+   
+    # Title Page
+    story.append(Spacer(1, 1*inch))
+    story.append(Paragraph("International E-commerce", h1_style))
+    story.append(Paragraph("Market Analysis Report", h2_style))
+    story.append(Spacer(1, 0.5*inch))
+   
+    # Add a colored line separator
+    from reportlab.graphics.shapes import Drawing, Line
+    d = Drawing(6*inch, 3)
+    line = Line(0, 0, 6*inch, 0)
+    line.strokeColor = cobalt
+    line.strokeWidth = 3
+    d.add(line)
+    story.append(d)
+    story.append(Spacer(1, 0.3*inch))
+   
+    country_list = ", ".join(selected_countries_list) if len(selected_countries_list) <= 5 else f"{len(selected_countries_list)} countries selected"
+    story.append(Paragraph(f"<b>Selected Markets:</b> {country_list}", body_style))
+    story.append(Paragraph(f"<b>Report Generated:</b> {datetime.now().strftime('%B %d, %Y at %H:%M')}", body_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    # ShipBob branding
+    story.append(Paragraph("Powered by ShipBob International Expansion Tool", h6_style))
+   
+    story.append(PageBreak())
+   
+    # Executive Summary
+    story.append(Paragraph("Executive Summary", h3_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    summary_data = [
+        ['Metric', 'Value'],
+        ['Total E-commerce Shoppers', f"{df_export['Shoppers_Millions'].sum():.1f}M"],
+        ['Total Market Size', f"${df_export['Spend_Billions'].sum():.1f}B"],
+        ['Average Revenue per Shopper', f"${df_export['Revenue_Per_Shopper'].mean():.0f}"],
+        ['Average YoY Growth Rate', f"{df_export['Spend_YoY'].mean():.1f}%"]
+    ]
+   
+    summary_table = Table(summary_data, colWidths=[3.5*inch, 2.5*inch])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), cobalt),
+        ('TEXTCOLOR', (0, 0), (-1, 0), white),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 15),
+        ('FONTSIZE', (0, 1), (-1, -1), 13),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+        ('TOPPADDING', (0, 0), (-1, -1), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F5F5')),
+        ('LINEBELOW', (0, 0), (-1, 0), 2, cobalt),
+        ('LINEBELOW', (0, 1), (-1, -2), 0.5, cloud),
+        ('LINEBELOW', (0, -1), (-1, -1), 2, cobalt)
+    ]))
+    story.append(summary_table)
+    story.append(PageBreak())
+   
+    # Top Markets Table
+    story.append(Paragraph("Top Markets by Total Spend", h4_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    top_markets = df_export.nlargest(10, 'Spend_Billions')[['Country', 'Spend_Billions', 'Shoppers_Millions', 'Revenue_Per_Shopper', 'Spend_YoY']]
+   
+    table_data = [['Country', 'Market Size', 'Shoppers', 'AOV', 'Growth']]
+    for idx, row in top_markets.iterrows():
+        table_data.append([
+            row['Country'],
+            f"${row['Spend_Billions']:.1f}B",
+            f"{row['Shoppers_Millions']:.1f}M",
+            f"${row['Revenue_Per_Shopper']:.0f}",
+            f"{row['Spend_YoY']:.1f}%"
+        ])
+   
+    markets_table = Table(table_data, colWidths=[1.8*inch, 1.2*inch, 1.1*inch, 1.0*inch, 1.0*inch])
+    markets_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), cobalt),
+        ('TEXTCOLOR', (0, 0), (-1, 0), white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 13),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, colors.HexColor('#F5F5F5')]),
+        ('LINEBELOW', (0, 0), (-1, 0), 2, cobalt),
+        ('GRID', (0, 0), (-1, -1), 0.5, cloud)
+    ]))
+    story.append(markets_table)
+    story.append(PageBreak())
+   
+    # Market Segmentation
+    story.append(Paragraph("Market Segmentation by Region", h4_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    region_summary = df_export.groupby('Business_Region').agg({
+        'Spend_Billions': 'sum',
+        'Shoppers_Millions': 'sum',
+        'Country': 'count'
+    }).reset_index()
+    region_summary = region_summary.sort_values('Spend_Billions', ascending=False)
+   
+    region_data = [['Business Region', 'Total Spend', 'Total Shoppers', 'Countries']]
+    for _, row in region_summary.iterrows():
+        region_data.append([
+            row['Business_Region'],
+            f"${row['Spend_Billions']:.1f}B",
+            f"{row['Shoppers_Millions']:.1f}M",
+            str(row['Country'])
+        ])
+   
+    region_table = Table(region_data, colWidths=[2.2*inch, 1.6*inch, 1.6*inch, 1.0*inch])
+    region_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), sky),
+        ('TEXTCOLOR', (0, 0), (-1, 0), denim),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 13),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, colors.HexColor('#F5F5F5')]),
+        ('LINEBELOW', (0, 0), (-1, 0), 2, sky),
+        ('GRID', (0, 0), (-1, -1), 0.5, cloud)
+    ]))
+    story.append(region_table)
+    story.append(PageBreak())
+   
+    # Shopper Growth Analysis
+    story.append(Paragraph("Shopper Growth Analysis", h4_style))
+    story.append(Spacer(1, 0.15*inch))
+   
+    story.append(Paragraph(f"Total E-commerce Shoppers: <b>{df_export['Shoppers_Millions'].sum():.1f}M</b>", body_style))
+    story.append(Paragraph(f"Average Shopper Growth Rate: <b>{df_export['Shoppers_YoY'].mean():.1f}%</b>", body_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    story.append(Paragraph("Fastest Growing Markets", h5_style))
+    top_growth = df_export.nlargest(10, 'Shoppers_YoY')[['Country', 'Shoppers_YoY', 'Shoppers_Millions']]
+    growth_data = [['Country', 'Growth Rate', 'Current Shoppers']]
+    for _, row in top_growth.iterrows():
+        growth_data.append([
+            row['Country'],
+            f"{row['Shoppers_YoY']:.1f}%",
+            f"{row['Shoppers_Millions']:.1f}M"
+        ])
+   
+    growth_table = Table(growth_data, colWidths=[2.5*inch, 1.5*inch, 1.8*inch])
+    growth_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), carrot),
+        ('TEXTCOLOR', (0, 0), (-1, 0), white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 13),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, colors.HexColor('#FFF5F0')]),
+        ('LINEBELOW', (0, 0), (-1, 0), 2, carrot),
+        ('GRID', (0, 0), (-1, -1), 0.5, cloud)
+    ]))
+    story.append(growth_table)
+    story.append(PageBreak())
+   
+    # Payment Methods Analysis
+    story.append(Paragraph("Payment Method Preferences", h4_style))
+    story.append(Paragraph("Critical for checkout optimization and reducing cart abandonment", body_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    # Top BNPL markets
+    story.append(Paragraph("Top Buy Now Pay Later (BNPL) Markets", h5_style))
+    top_bnpl = df_export.nlargest(5, 'Payment_BNPL')[['Country', 'Payment_BNPL']]
+    bnpl_data = [['Country', 'BNPL Share']]
+    for _, row in top_bnpl.iterrows():
+        bnpl_data.append([row['Country'], f"{row['Payment_BNPL']:.1f}%"])
+   
+    bnpl_table = Table(bnpl_data, colWidths=[3.5*inch, 2*inch])
+    bnpl_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), canary),
+        ('TEXTCOLOR', (0, 0), (-1, 0), denim),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 13),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, colors.HexColor('#FFFEF5')]),
+        ('LINEBELOW', (0, 0), (-1, 0), 2, canary),
+        ('GRID', (0, 0), (-1, -1), 0.5, cloud)
+    ]))
+    story.append(bnpl_table)
+    story.append(Spacer(1, 0.3*inch))
+   
+    # Top A2A markets - Critical warning
+    story.append(Paragraph("⚠️ Account-to-Account (A2A) Transfer Markets", h5_style))
+    story.append(Paragraph("<b>Critical:</b> Markets with high A2A usage require bank transfer support", body_style))
+    story.append(Spacer(1, 0.1*inch))
+   
+    top_a2a = df_export.nlargest(5, 'Payment_A2A')[['Country', 'Payment_A2A']]
+    a2a_data = [['Country', 'A2A Share']]
+    for _, row in top_a2a.iterrows():
+        a2a_data.append([row['Country'], f"{row['Payment_A2A']:.1f}%"])
+   
+    a2a_table = Table(a2a_data, colWidths=[3.5*inch, 2*inch])
+    a2a_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FF4444')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 13),
+        ('FONTSIZE', (0, 1), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#FFF0F0'), colors.HexColor('#FFE5E5')]),
+        ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#FF4444')),
+        ('GRID', (0, 0), (-1, -1), 0.5, cloud)
+    ]))
+    story.append(a2a_table)
+    story.append(PageBreak())
+   
+    # Product Categories
+    story.append(Paragraph("Product Category Analysis", h4_style))
+    story.append(Paragraph("Top markets by category spend", body_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    category_cols_pdf = ['Fashion', 'Food', 'Furniture', 'Electronics', 'Beverages']
+    category_colors = [cobalt, sky, carrot, canary, colors.HexColor('#9B59B6')]
+   
+    for idx, category in enumerate(category_cols_pdf):
+        story.append(Paragraph(f"{category}", h5_style))
+        top_cat = df_export.nlargest(5, category)[['Country', category]]
+        cat_data = [['Country', 'Spend']]
+        for _, row in top_cat.iterrows():
+            cat_data.append([row['Country'], f"${row[category]:.1f}B"])
+       
+        cat_table = Table(cat_data, colWidths=[3.5*inch, 2*inch])
+        cat_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), category_colors[idx]),
+            ('TEXTCOLOR', (0, 0), (-1, 0), white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, colors.HexColor('#F9F9F9')]),
+            ('LINEBELOW', (0, 0), (-1, 0), 2, category_colors[idx]),
+            ('GRID', (0, 0), (-1, -1), 0.5, cloud)
+        ]))
+        story.append(cat_table)
+        story.append(Spacer(1, 0.15*inch))
+   
+    # Footer on last page
+    story.append(PageBreak())
+    story.append(Spacer(1, 2*inch))
+    story.append(Paragraph("End of Report", h3_style))
+    story.append(Spacer(1, 0.2*inch))
+   
+    # Add separator line
+    from reportlab.graphics.shapes import Drawing, Line
+    d2 = Drawing(6*inch, 3)
+    line2 = Line(0, 0, 6*inch, 0)
+    line2.strokeColor = cobalt
+    line2.strokeWidth = 2
+    d2.add(line2)
+    story.append(d2)
+    story.append(Spacer(1, 0.2*inch))
+   
+    story.append(Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y at %H:%M')}", h6_style))
+    story.append(Paragraph("Powered by ShipBob International Expansion Tool", h6_style))
+   
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 
 df = load_data()
 
@@ -840,6 +1240,27 @@ with tab7:
             st.markdown("---")
             
             st.success(f"💡 **Recommendation**: Focus on {top_3_motivators.iloc[0]['Motivator']} to maximize conversion in {selected_for_motivator}")
+
+st.sidebar.markdown("---")
+
+# PDF Export Section
+if PDF_AVAILABLE:
+    if st.sidebar.button("Generate PDF Report", type="primary", use_container_width=True):
+        with st.spinner("Generating PDF report..."):
+            pdf_buffer = create_pdf_report(df_filtered, selected_countries if selected_countries else df_filtered['Country'].tolist())
+           
+            if pdf_buffer:
+                st.sidebar.download_button(
+                    label="📥 Download PDF",
+                    data=pdf_buffer,
+                    file_name=f"market_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+                st.sidebar.success("✅ PDF generated successfully!")
+else:
+    st.sidebar.warning("⚠️ PDF export requires: pip install reportlab kaleido")
+    st.sidebar.info("Run this in your terminal and restart the app.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Data Source**: Global E-commerce Market Research 2025")
