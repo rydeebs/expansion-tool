@@ -676,20 +676,23 @@ with tab7:
     
     st.markdown("---")
     
-    # Motivator horizontal bar chart
-    st.subheader("Purchase Motivator Importance by Country")
+    # Motivator horizontal bar chart by Region
+    st.subheader("Purchase Motivator Importance by Region")
     
     if len(selected_countries) > 0:
-        # Country selector - default to single country if only one is selected
-        if len(selected_countries) == 1:
-            # Automatically use the single selected country
-            selected_country_for_chart = selected_countries[0]
+        # Get available regions from filtered data
+        available_regions = sorted(df_filtered['Business_Region'].unique().tolist())
+        
+        # Region selector - default to single region if only one is available
+        if len(available_regions) == 1:
+            # Automatically use the single available region
+            selected_region_for_chart = available_regions[0]
         else:
-            # Show dropdown if multiple countries are selected
-            selected_country_for_chart = st.selectbox(
-                "Select Country for Detailed Analysis",
-                selected_countries,
-                key="motivator_country_selector"
+            # Show dropdown if multiple regions are available
+            selected_region_for_chart = st.selectbox(
+                "Select Region for Detailed Analysis",
+                available_regions,
+                key="motivator_region_selector"
             )
         
         # Prepare data for horizontal bar chart
@@ -707,24 +710,24 @@ with tab7:
             'Motivator_Click_Collect': 'Click & Collect'
         }
         
-        # Get data for the selected country
-        country_data = df_filtered[df_filtered['Country'] == selected_country_for_chart]
+        # Get data for the selected region and calculate averages
+        region_data = df_filtered[df_filtered['Business_Region'] == selected_region_for_chart]
         
-        if not country_data.empty:
-            # Prepare data for the chart
+        if not region_data.empty:
+            # Calculate average importance for each motivator in the region
             chart_data = []
             for motivator_col in motivator_cols:
                 motivator_name = motivator_display_names.get(motivator_col, motivator_col)
-                value = country_data[motivator_col].iloc[0]
+                avg_value = region_data[motivator_col].mean()
                 chart_data.append({
                     'Motivator': motivator_name,
-                    'Importance': value
+                    'Importance': avg_value
                 })
             
             chart_df = pd.DataFrame(chart_data)
             chart_df = chart_df.sort_values('Importance', ascending=True)
             
-            # Create horizontal bar chart for single country
+            # Create horizontal bar chart for single region
             fig_motivator_bar = px.bar(
                 chart_df,
                 x='Importance',
@@ -733,7 +736,7 @@ with tab7:
                 text='Importance',
                 color='Importance',
                 color_continuous_scale='RdYlGn',
-                title=f'Purchase Motivators for {selected_country_for_chart}',
+                title=f'Purchase Motivators for {selected_region_for_chart} (Average %)',
                 labels={'Importance': 'Importance (%)', 'Motivator': 'Motivator'}
             )
             
