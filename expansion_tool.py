@@ -680,6 +680,18 @@ with tab7:
     st.subheader("Purchase Motivator Importance by Country")
     
     if len(selected_countries) > 0:
+        # Country selector - default to single country if only one is selected
+        if len(selected_countries) == 1:
+            # Automatically use the single selected country
+            selected_country_for_chart = selected_countries[0]
+        else:
+            # Show dropdown if multiple countries are selected
+            selected_country_for_chart = st.selectbox(
+                "Select Country for Detailed Analysis",
+                selected_countries,
+                key="motivator_country_selector"
+            )
+        
         # Prepare data for horizontal bar chart
         motivator_display_names = {
             'Motivator_Free_Delivery': 'Free Delivery',
@@ -695,60 +707,49 @@ with tab7:
             'Motivator_Click_Collect': 'Click & Collect'
         }
         
-        # Create a long format dataframe for the bar chart
-        chart_data = []
-        for country in selected_countries:
-            country_data = df_filtered[df_filtered['Country'] == country]
-            if not country_data.empty:
-                for motivator_col in motivator_cols:
-                    motivator_name = motivator_display_names.get(motivator_col, motivator_col)
-                    value = country_data[motivator_col].iloc[0]
-                    chart_data.append({
-                        'Country': country,
-                        'Motivator': motivator_name,
-                        'Importance': value
-                    })
+        # Get data for the selected country
+        country_data = df_filtered[df_filtered['Country'] == selected_country_for_chart]
         
-        chart_df = pd.DataFrame(chart_data)
-        
-        # Create horizontal grouped bar chart
-        fig_motivator_bar = go.Figure()
-        
-        # Get unique countries and motivators
-        countries = chart_df['Country'].unique()
-        motivators = chart_df['Motivator'].unique()
-        
-        # Create a trace for each country
-        colors = px.colors.qualitative.Set3
-        for i, country in enumerate(countries):
-            country_data = chart_df[chart_df['Country'] == country]
-            fig_motivator_bar.add_trace(go.Bar(
-                name=country,
-                y=country_data['Motivator'],
-                x=country_data['Importance'],
+        if not country_data.empty:
+            # Prepare data for the chart
+            chart_data = []
+            for motivator_col in motivator_cols:
+                motivator_name = motivator_display_names.get(motivator_col, motivator_col)
+                value = country_data[motivator_col].iloc[0]
+                chart_data.append({
+                    'Motivator': motivator_name,
+                    'Importance': value
+                })
+            
+            chart_df = pd.DataFrame(chart_data)
+            chart_df = chart_df.sort_values('Importance', ascending=True)
+            
+            # Create horizontal bar chart for single country
+            fig_motivator_bar = px.bar(
+                chart_df,
+                x='Importance',
+                y='Motivator',
                 orientation='h',
-                marker_color=colors[i % len(colors)],
-                text=[f"{val:.1f}%" for val in country_data['Importance']],
-                textposition='outside'
-            ))
-        
-        fig_motivator_bar.update_layout(
-            barmode='group',
-            height=max(600, len(motivators) * 40),
-            xaxis_title='Importance (%)',
-            yaxis_title='Motivator',
-            title='Purchase Motivator Importance by Country',
-            showlegend=True,
-            legend=dict(
-                orientation="v",
-                yanchor="top",
-                y=1,
-                xanchor="left",
-                x=1.02
+                text='Importance',
+                color='Importance',
+                color_continuous_scale='RdYlGn',
+                title=f'Purchase Motivators for {selected_country_for_chart}',
+                labels={'Importance': 'Importance (%)', 'Motivator': 'Motivator'}
             )
-        )
-        
-        st.plotly_chart(fig_motivator_bar, use_container_width=True)
+            
+            fig_motivator_bar.update_traces(
+                texttemplate='%{text:.1f}%',
+                textposition='outside'
+            )
+            
+            fig_motivator_bar.update_layout(
+                height=max(500, len(chart_df) * 40),
+                xaxis_title='Importance (%)',
+                yaxis_title='Motivator',
+                showlegend=False
+            )
+            
+            st.plotly_chart(fig_motivator_bar, use_container_width=True)
     
     st.markdown("---")
     
