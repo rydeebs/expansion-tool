@@ -547,38 +547,82 @@ with tab5:
     
     st.markdown("---")
     
-    # All categories heatmap
+    # Category comparison by country - horizontal bar chart
     st.subheader("Category Comparison Across Selected Markets")
     
     if len(selected_countries) > 0:
-        # Create heatmap data
-        heatmap_data = df_filtered[df_filtered['Country'].isin(selected_countries)][['Country'] + category_cols].set_index('Country')
+        # Country selector - default to single country if only one is selected
+        if len(selected_countries) == 1:
+            # Automatically use the single selected country
+            selected_country_for_categories = selected_countries[0]
+        else:
+            # Show dropdown if multiple countries are selected
+            selected_country_for_categories = st.selectbox(
+                "Select Country",
+                selected_countries,
+                key="category_country_selector"
+            )
         
-        fig_heatmap = px.imshow(
-            heatmap_data.T,
-            labels=dict(x="Country", y="Category", color="Spend ($B)"),
-            x=heatmap_data.index,
-            y=heatmap_data.columns,
-            color_continuous_scale='YlOrRd',
-            aspect='auto'
-        )
-        fig_heatmap.update_layout(height=500)
-        st.plotly_chart(fig_heatmap, use_container_width=True)
+        # Get data for the selected country
+        country_data = df_filtered[df_filtered['Country'] == selected_country_for_categories]
+        
+        if not country_data.empty:
+            # Prepare data for horizontal bar chart
+            chart_data = []
+            for category_col in category_cols:
+                value = country_data[category_col].iloc[0]
+                if pd.notna(value) and value > 0:  # Only include categories with data
+                    chart_data.append({
+                        'Category': category_col,
+                        'Spend': value
+                    })
+            
+            if chart_data:
+                chart_df = pd.DataFrame(chart_data)
+                chart_df = chart_df.sort_values('Spend', ascending=True)
+                
+                # Create horizontal bar chart
+                fig_category_bar = px.bar(
+                    chart_df,
+                    x='Spend',
+                    y='Category',
+                    orientation='h',
+                    text='Spend',
+                    color='Spend',
+                    color_continuous_scale='YlOrRd',
+                    title=f'Product Category Spend for {selected_country_for_categories}',
+                    labels={'Spend': 'Spend ($B)', 'Category': 'Category'}
+                )
+                
+                fig_category_bar.update_traces(
+                    texttemplate='$%{text:.1f}B',
+                    textposition='outside'
+                )
+                
+                fig_category_bar.update_layout(
+                    height=max(500, len(chart_df) * 40),
+                    xaxis_title='Spend ($B)',
+                    yaxis_title='Category',
+                    showlegend=False
+                )
+                
+                st.plotly_chart(fig_category_bar, use_container_width=True)
         
         st.markdown("---")
         
-        # Category mix for selected country
-        if len(selected_countries) > 0:
-            selected_for_mix = st.selectbox("Select Country for Category Mix", selected_countries)
-            
-            country_data = df_filtered[df_filtered['Country'] == selected_for_mix][category_cols].T
-            country_data.columns = ['Spend']
-            country_data = country_data.reset_index()
-            country_data.columns = ['Category', 'Spend']
-            country_data = country_data.sort_values('Spend', ascending=False)
-            
+        # Category mix for selected country (pie chart)
+        selected_for_mix = selected_country_for_categories
+        
+        country_data_mix = df_filtered[df_filtered['Country'] == selected_for_mix][category_cols].T
+        country_data_mix.columns = ['Spend']
+        country_data_mix = country_data_mix.reset_index()
+        country_data_mix.columns = ['Category', 'Spend']
+        country_data_mix = country_data_mix[country_data_mix['Spend'] > 0]  # Filter out zero values
+        country_data_mix = country_data_mix.sort_values('Spend', ascending=False)
+        
+        if not country_data_mix.empty:
             fig_pie = px.pie(
-                country_data,
+                country_data_mix,
                 values='Spend',
                 names='Category',
                 title=f'Category Mix for {selected_for_mix}'
