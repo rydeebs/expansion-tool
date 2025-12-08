@@ -676,13 +676,11 @@ with tab7:
     
     st.markdown("---")
     
-    # Motivator heatmap
+    # Motivator horizontal bar chart
     st.subheader("Purchase Motivator Importance by Country")
     
     if len(selected_countries) > 0:
-        motivator_data = df_filtered[df_filtered['Country'].isin(selected_countries)][['Country'] + motivator_cols].set_index('Country')
-        
-        # Rename for display
+        # Prepare data for horizontal bar chart
         motivator_display_names = {
             'Motivator_Free_Delivery': 'Free Delivery',
             'Motivator_Next_Day': 'Next Day Delivery',
@@ -696,18 +694,61 @@ with tab7:
             'Motivator_Guest_Checkout': 'Guest Checkout',
             'Motivator_Click_Collect': 'Click & Collect'
         }
-        motivator_data.columns = [motivator_display_names.get(col, col) for col in motivator_data.columns]
         
-        fig_motivator_heat = px.imshow(
-            motivator_data.T,
-            labels=dict(x="Country", y="Motivator", color="Importance (%)"),
-            x=motivator_data.index,
-            y=motivator_data.columns,
-            color_continuous_scale='RdYlGn',
-            aspect='auto'
+        # Create a long format dataframe for the bar chart
+        chart_data = []
+        for country in selected_countries:
+            country_data = df_filtered[df_filtered['Country'] == country]
+            if not country_data.empty:
+                for motivator_col in motivator_cols:
+                    motivator_name = motivator_display_names.get(motivator_col, motivator_col)
+                    value = country_data[motivator_col].iloc[0]
+                    chart_data.append({
+                        'Country': country,
+                        'Motivator': motivator_name,
+                        'Importance': value
+                    })
+        
+        chart_df = pd.DataFrame(chart_data)
+        
+        # Create horizontal grouped bar chart
+        fig_motivator_bar = go.Figure()
+        
+        # Get unique countries and motivators
+        countries = chart_df['Country'].unique()
+        motivators = chart_df['Motivator'].unique()
+        
+        # Create a trace for each country
+        colors = px.colors.qualitative.Set3
+        for i, country in enumerate(countries):
+            country_data = chart_df[chart_df['Country'] == country]
+            fig_motivator_bar.add_trace(go.Bar(
+                name=country,
+                y=country_data['Motivator'],
+                x=country_data['Importance'],
+                orientation='h',
+                marker_color=colors[i % len(colors)],
+                text=[f"{val:.1f}%" for val in country_data['Importance']],
+                textposition='outside'
+            ))
+        
+        fig_motivator_bar.update_layout(
+            barmode='group',
+            height=max(600, len(motivators) * 40),
+            xaxis_title='Importance (%)',
+            yaxis_title='Motivator',
+            title='Purchase Motivator Importance by Country',
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="top",
+                y=1,
+                xanchor="left",
+                x=1.02
+            )
         )
-        fig_motivator_heat.update_layout(height=600)
-        st.plotly_chart(fig_motivator_heat, use_container_width=True)
+        
+        st.plotly_chart(fig_motivator_bar, use_container_width=True)
     
     st.markdown("---")
     
