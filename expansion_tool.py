@@ -943,8 +943,13 @@ with tab4:
 with tab5:
     st.header("Product Category Analysis")
     
-    # Category selector
-    selected_category = st.selectbox("Select Category to Analyze", category_cols)
+    # Category selector synced with sidebar selection
+    default_cat_index = category_cols.index(selected_category) if selected_category in category_cols else 0
+    selected_category_tab = st.selectbox(
+        "Select Category to Analyze",
+        category_cols,
+        index=default_cat_index
+    )
     
     st.markdown("---")
     
@@ -952,19 +957,19 @@ with tab5:
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader(f"Top Markets for {selected_category}")
+        st.subheader(f"Top Markets for {selected_category_tab}")
         
-        top_category = df_filtered.nlargest(15, selected_category)[['Country', selected_category, 'Spend_Billions']]
+        top_category = df_filtered.nlargest(15, selected_category_tab)[['Country', selected_category_tab, 'Spend_Billions']]
         
         fig_cat = px.bar(
             top_category,
-            x=selected_category,
+            x=selected_category_tab,
             y='Country',
             orientation='h',
-            text=selected_category,
+            text=selected_category_tab,
             color='Spend_Billions',
             color_continuous_scale='Viridis',
-            labels={selected_category: f'{selected_category} Spend ($B)', 'Spend_Billions': 'Total Market Size ($B)'}
+            labels={selected_category_tab: f'{selected_category_tab} Spend ($B)', 'Spend_Billions': 'Total Market Size ($B)'}
         )
         fig_cat.update_traces(texttemplate='$%{text:.1f}B', textposition='outside')
         fig_cat.update_layout(height=500)
@@ -973,15 +978,15 @@ with tab5:
     with col2:
         st.subheader("Category Stats")
         
-        total_category_spend = df_filtered[selected_category].sum()
+        total_category_spend = df_filtered[selected_category_tab].sum()
         st.metric("Total Category Spend", f"${total_category_spend:.1f}B")
         
-        avg_category_spend = df_filtered[selected_category].mean()
+        avg_category_spend = df_filtered[selected_category_tab].mean()
         st.metric("Avg per Country", f"${avg_category_spend:.1f}B")
         
-        top_market = df_filtered.nlargest(1, selected_category)
+        top_market = df_filtered.nlargest(1, selected_category_tab)
         if not top_market.empty:
-            st.metric("Top Market", top_market.iloc[0]['Country'], f"${top_market.iloc[0][selected_category]:.1f}B")
+            st.metric("Top Market", top_market.iloc[0]['Country'], f"${top_market.iloc[0][selected_category_tab]:.1f}B")
     
     st.markdown("---")
     
