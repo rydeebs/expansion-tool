@@ -524,6 +524,29 @@ def create_pdf_report(df_export, selected_countries_list):
 
 df = load_data()
 
+# Helper function to format numbers with commas
+def format_number_with_commas(value, suffix=''):
+    """Format numbers with commas for values > 1000"""
+    if pd.isna(value):
+        return 'N/A'
+    
+    # Convert to float first
+    num_value = float(value)
+    
+    # If the number is >= 1000, format with commas
+    if num_value >= 1000:
+        # Format with 1 decimal place if it's not a whole number
+        if num_value == int(num_value):
+            return f"{int(num_value):,}{suffix}"
+        else:
+            return f"{num_value:,.1f}{suffix}"
+    else:
+        # For numbers < 1000, just format normally
+        if num_value == int(num_value):
+            return f"{int(num_value)}{suffix}"
+        else:
+            return f"{num_value:.1f}{suffix}"
+
 # Title
 st.title("🌍 International E-commerce Market Expansion Tool")
 st.markdown("**Analyze global e-commerce markets to identify expansion opportunities**")
@@ -547,6 +570,13 @@ selected_countries = st.sidebar.multiselect(
     default=available_countries  # Show all countries by default
 )
 
+# Category filter
+category_cols_list = ['All', 'Fashion', 'Food', 'Furniture', 'Electronics', 'Beverages', 
+                     'Beauty & Personal Care', 'DIY & Hardware', 'Toys & Hobby', 
+                     'Tobacco', 'Household Essentials', 'OTC Pharmaceuticals', 
+                     'Eyewear', 'Physical Media']
+selected_category = st.sidebar.selectbox("Product Category", category_cols_list)
+
 # Filter dataframe
 if selected_region != 'All':
     df_filtered = df[df['Business_Region'] == selected_region].copy()
@@ -555,6 +585,10 @@ else:
 
 if selected_countries:
     df_filtered = df_filtered[df_filtered['Country'].isin(selected_countries)]
+
+# Apply category filter - only show countries with data in selected category
+if selected_category != 'All':
+    df_filtered = df_filtered[df_filtered[selected_category].notna() & (df_filtered[selected_category] > 0)]
 
 # Product category columns
 category_cols = ['Fashion', 'Food', 'Furniture', 'Electronics', 'Beverages', 
@@ -590,11 +624,15 @@ with tab1:
     
     with col1:
         total_shoppers = df_filtered['Shoppers_Millions'].sum()
-        st.metric("Total Shoppers", f"{total_shoppers:.1f}M")
+        # Format with commas if > 1000
+        shoppers_str = format_number_with_commas(total_shoppers, 'M')
+        st.metric("Total Shoppers", shoppers_str)
     
     with col2:
         total_spend = df_filtered['Spend_Billions'].sum()
-        st.metric("Total Market Size", f"${total_spend:.1f}B")
+        # Format with commas if > 1000
+        spend_str = format_number_with_commas(total_spend, 'B')
+        st.metric("Total Market Size", f"${spend_str}")
     
     with col3:
         avg_revenue = df_filtered['Revenue_Per_Shopper'].mean()
@@ -611,11 +649,11 @@ with tab1:
     
     top_markets = df_filtered.nlargest(10, 'Spend_Billions')[['Country', 'Spend_Billions', 'Shoppers_Millions', 'Revenue_Per_Shopper', 'Spend_YoY']]
     top_markets_display = top_markets.copy()
-    top_markets_display['Spend_Billions'] = top_markets_display['Spend_Billions'].apply(lambda x: f"${x:.1f}B")
-    top_markets_display['Shoppers_Millions'] = top_markets_display['Shoppers_Millions'].apply(lambda x: f"{x:.1f}M")
+    top_markets_display['Spend_Billions'] = top_markets_display['Spend_Billions'].apply(lambda x: f"${format_number_with_commas(x, 'B')}")
+    top_markets_display['Shoppers_Millions'] = top_markets_display['Shoppers_Millions'].apply(lambda x: f"{format_number_with_commas(x, 'M')}")
     top_markets_display['Revenue_Per_Shopper'] = top_markets_display['Revenue_Per_Shopper'].apply(lambda x: f"${x:.0f}")
     top_markets_display['Spend_YoY'] = top_markets_display['Spend_YoY'].apply(lambda x: f"{x:.1f}%")
-    top_markets_display.columns = ['Country', 'Market Size', 'Shoppers', 'AOV', 'Growth']
+    top_markets_display.columns = ['Country', 'Market Size', 'Shoppers', 'Avg Revenue/Shopper', 'Growth']
     
     st.dataframe(top_markets_display, use_container_width=True, hide_index=True)
 
