@@ -1583,12 +1583,10 @@ with tab8:
         st.subheader("💡 LPI Score vs Market Size")
         
         # Merge LPI data with market data
-        # Always include Business_Region from df_filtered since we know it's there
-        merge_cols = ['Country', 'Spend_Billions', 'Shoppers_Millions', 'Business_Region']
-        
-        # Only include Business_Region if it exists in df_filtered
-        if 'Business_Region' not in df_filtered.columns:
-            merge_cols.remove('Business_Region')
+        # Always include Business_Region from df_filtered if available
+        merge_cols = ['Country', 'Spend_Billions', 'Shoppers_Millions']
+        if 'Business_Region' in df_filtered.columns:
+            merge_cols.append('Business_Region')
         
         # Merge LPI data with market data (including Business_Region)
         merged_data = pd.merge(
