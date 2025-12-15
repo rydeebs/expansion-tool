@@ -140,7 +140,7 @@ def load_data():
 # Load LPI Metrics data
 @st.cache_data
 def load_lpi_data():
-    """Load and clean LPI Metrics data, merge with Global_Regions to get Business_Region"""
+    """Load and clean LPI Metrics data (now includes Business Region, World Bank Region, and ISO2)"""
     lpi_df = pd.read_csv('LPI Metrics.csv')
     
     # Clean column names - remove extra spaces
@@ -148,30 +148,6 @@ def load_lpi_data():
     
     # Rename 'Economy' to 'Country' for consistency
     lpi_df = lpi_df.rename(columns={'Economy': 'Country'})
-    
-    # Load Global_Regions to get Business_Region mapping
-    regions_df = pd.read_csv('Global_Regions.csv', header=[0, 1, 2])
-    # Flatten the multi-level columns
-    regions_df.columns = ['_'.join([str(c) for c in col if 'Unnamed' not in str(c)]).strip('_') for col in regions_df.columns]
-    regions_df.columns = regions_df.columns.str.replace('  ', ' ').str.strip()
-    
-    # Find Business_Region and Country columns
-    business_region_col = None
-    country_col = None
-    for col in regions_df.columns:
-        if 'Market Segmentation' in col and 'Business Region' in col:
-            business_region_col = col
-        elif col == 'Country':
-            country_col = col
-    
-    # Create a mapping dataframe with just Country and Business_Region
-    if business_region_col and country_col:
-        region_mapping = regions_df[[country_col, business_region_col]].copy()
-        region_mapping.columns = ['Country', 'Business_Region']
-        region_mapping = region_mapping.drop_duplicates(subset=['Country'])
-        
-        # Merge LPI data with Business_Region
-        lpi_df = lpi_df.merge(region_mapping, on='Country', how='left')
     
     return lpi_df
 
@@ -1583,41 +1559,70 @@ with tab8:
         st.subheader("💡 LPI Score vs Market Size")
         
         # Merge LPI data with market data
-        # Always include Business_Region from df_filtered if available
+        # Include Business_Region and World Bank Region from lpi_filtered (now in CSV)
         merge_cols = ['Country', 'Spend_Billions', 'Shoppers_Millions']
-        if 'Business_Region' in df_filtered.columns:
-            merge_cols.append('Business_Region')
         
-        # Merge LPI data with market data (including Business_Region)
+        # Start with LPI data (which now includes Business_Region, World Bank Region, ISO2)
+        lpi_merge_cols = ['Country']
+        if 'Business_Region' in lpi_filtered.columns:
+            lpi_merge_cols.append('Business_Region')
+        if 'World Bank Region' in lpi_filtered.columns:
+            lpi_merge_cols.append('World Bank Region')
+        if 'ISO2' in lpi_filtered.columns:
+            lpi_merge_cols.append('ISO2')
+        
+        # Merge LPI data with market data
         merged_data = pd.merge(
-            lpi_filtered,
+            lpi_filtered[lpi_merge_cols],
             df_filtered[merge_cols],
             on='Country',
-            how='inner'
+            how='inner',
+            suffixes=('', '_drop')
         )
         
-        # Ensure Business_Region is present - if not, add it from df_filtered
+        # Drop any duplicate columns created by merge
+        merged_data = merged_data.loc[:, ~merged_data.columns.str.endswith('_drop')]
+        
+        # If Business_Region not in lpi_filtered, try to get it from df_filtered
         if 'Business_Region' not in merged_data.columns and 'Business_Region' in df_filtered.columns:
             region_map = df_filtered[['Country', 'Business_Region']].drop_duplicates(subset=['Country'])
             merged_data = merged_data.merge(region_map, on='Country', how='left')
         
         if len(merged_data) > 0:
-            # Business Region filter - always show if Business_Region column exists and has values
+            # Region filter - allow filtering by Business Region or World Bank Region
+            col1, col2 = st.columns(2)
+            
             selected_lpi_region = 'All'
-            if 'Business_Region' in merged_data.columns:
-                # Get unique regions, filtering out NaN values
-                unique_regions = merged_data['Business_Region'].dropna().unique().tolist()
-                if len(unique_regions) > 0:
-                    available_regions = ['All'] + sorted(unique_regions)
-                    selected_lpi_region = st.selectbox(
-                        "Filter by Business Region",
-                        available_regions,
-                        key='lpi_region_filter'
-                    )
-                    
-                    # Filter by selected region
-                    if selected_lpi_region != 'All':
-                        merged_data = merged_data[merged_data['Business_Region'] == selected_lpi_region].copy()
+            selected_wb_region = 'All'
+            
+            with col1:
+                if 'Business_Region' in merged_data.columns:
+                    unique_regions = merged_data['Business_Region'].dropna().unique().tolist()
+                    if len(unique_regions) > 0:
+                        available_regions = ['All'] + sorted(unique_regions)
+                        selected_lpi_region = st.selectbox(
+                            "Filter by Business Region",
+                            available_regions,
+                            key='lpi_business_region_filter'
+                        )
+            
+            with col2:
+                if 'World Bank Region' in merged_data.columns:
+                    unique_wb_regions = merged_data['World Bank Region'].dropna().unique().tolist()
+                    if len(unique_wb_regions) > 0:
+                        available_wb_regions = ['All'] + sorted(unique_wb_regions)
+                        selected_wb_region = st.selectbox(
+                            "Filter by World Bank Region",
+                            available_wb_regions,
+                            key='lpi_wb_region_filter'
+                        )
+            
+            # Apply filters
+            if selected_lpi_region != 'All':
+                merged_data = merged_data[merged_data['Business_Region'] == selected_lpi_region].copy()
+            
+            if selected_wb_region != 'All':
+                merged_data = merged_data[merged_data['World Bank Region'] == selected_wb_region].copy()
             
             if len(merged_data) > 0:
                 # Add tabs for different views
@@ -1625,8 +1630,11 @@ with tab8:
                 
                 with tab1:
                     # Determine color column - use Business_Region if available and multiple regions, otherwise use LPI Score
-                    if 'Business_Region' in merged_data.columns and selected_lpi_region == 'All' and merged_data['Business_Region'].nunique() > 1:
+                    if 'Business_Region' in merged_data.columns and selected_lpi_region == 'All' and selected_wb_region == 'All' and merged_data['Business_Region'].nunique() > 1:
                         color_col = 'Business_Region'
+                        color_scale = None
+                    elif 'World Bank Region' in merged_data.columns and selected_lpi_region == 'All' and selected_wb_region == 'All' and merged_data['World Bank Region'].nunique() > 1:
+                        color_col = 'World Bank Region'
                         color_scale = None
                     else:
                         color_col = 'LPI Score'
@@ -1645,7 +1653,8 @@ with tab8:
                             'LPI Score': 'LPI Score (1-5)',
                             'Spend_Billions': 'Market Size ($B)',
                             'Shoppers_Millions': 'Shoppers (M)',
-                            'Business_Region': 'Business Region'
+                            'Business_Region': 'Business Region',
+                            'World Bank Region': 'World Bank Region'
                         }
                     )
                     fig_scatter.update_layout(height=600)
@@ -1653,12 +1662,25 @@ with tab8:
                 
                 with tab2:
                     # Create a formatted table view
-                    display_data = merged_data[['Country', 'LPI Score', 'Spend_Billions', 'Shoppers_Millions']].copy()
+                    table_cols = ['Country', 'LPI Score', 'Spend_Billions', 'Shoppers_Millions']
+                    if 'Business_Region' in merged_data.columns:
+                        table_cols.insert(1, 'Business_Region')
+                    if 'World Bank Region' in merged_data.columns:
+                        table_cols.insert(2, 'World Bank Region')
+                    
+                    display_data = merged_data[table_cols].copy()
                     display_data = display_data.sort_values('LPI Score', ascending=False)
                     display_data['LPI Score'] = display_data['LPI Score'].apply(lambda x: f"{x:.2f}")
                     display_data['Spend_Billions'] = display_data['Spend_Billions'].apply(lambda x: format_number_with_commas(x, 'B'))
                     display_data['Shoppers_Millions'] = display_data['Shoppers_Millions'].apply(lambda x: format_number_with_commas(x, 'M'))
-                    display_data.columns = ['Country', 'LPI Score', 'Market Size ($B)', 'Shoppers (M)']
+                    
+                    # Rename columns for display
+                    col_rename = {'Country': 'Country', 'LPI Score': 'LPI Score', 'Spend_Billions': 'Market Size ($B)', 'Shoppers_Millions': 'Shoppers (M)'}
+                    if 'Business_Region' in display_data.columns:
+                        col_rename['Business_Region'] = 'Business Region'
+                    if 'World Bank Region' in display_data.columns:
+                        col_rename['World Bank Region'] = 'World Bank Region'
+                    display_data.columns = [col_rename.get(col, col) for col in display_data.columns]
                     
                     # Style the dataframe
                     st.dataframe(
@@ -1681,10 +1703,24 @@ with tab8:
         # Full data table
         st.subheader("📋 Complete LPI Data")
         
-        display_cols = ['Country', 'LPI Score', 'LPI Grouped Rank', 
+        display_cols = ['Country']
+        
+        # Add region columns if available
+        if 'Business_Region' in lpi_filtered.columns:
+            display_cols.append('Business_Region')
+        if 'World Bank Region' in lpi_filtered.columns:
+            display_cols.append('World Bank Region')
+        if 'ISO2' in lpi_filtered.columns:
+            display_cols.append('ISO2')
+        
+        # Add LPI scores
+        display_cols.extend(['LPI Score', 'LPI Grouped Rank', 
                        'Customs Score', 'Infrastructure Score', 'International Shipments Score',
                        'Logistics Competence and Quality Score', 'Timeliness Score', 
-                       'Tracking and Tracing Score']
+                       'Tracking and Tracing Score'])
+        
+        # Only include columns that exist
+        display_cols = [col for col in display_cols if col in lpi_filtered.columns]
         
         lpi_table = lpi_filtered[display_cols].sort_values('LPI Score', ascending=False).reset_index(drop=True)
         
