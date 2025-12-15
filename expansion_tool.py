@@ -141,7 +141,7 @@ def load_data():
 @st.cache_data
 def load_lpi_data():
     """Load and clean LPI Metrics data"""
-    lpi_df = pd.read_csv('LPI_Metrics.csv')
+    lpi_df = pd.read_csv('LPI Metrics.csv')
     
     # Clean column names - remove extra spaces
     lpi_df.columns = lpi_df.columns.str.strip()
@@ -1458,4 +1458,3 @@ with tab8:
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Data Source**: Global E-commerce Market Research 2025")
-st.sidebar.markdown("**Last Updated**: December 2024")
