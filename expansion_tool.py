@@ -1363,42 +1363,39 @@ with tab8:
             
             for stat, value in component_stats.items():
                 st.metric(stat, f"{value:.2f}")
-            
-            st.markdown("---")
-            
-            # Distribution histogram
-            fig_dist = px.histogram(
-                lpi_filtered,
-                x=component_col,
-                nbins=20,
-                title=f'{selected_component} Score Distribution',
-                labels={component_col: 'Score'},
-                color_discrete_sequence=['#175CFF']
-            )
-            fig_dist.update_layout(height=300)
-            st.plotly_chart(fig_dist, use_container_width=True)
         
         st.markdown("---")
         
-        # Heatmap - All components across countries
-        st.subheader("🗺️ LPI Components Heatmap")
+        # Horizontal Bar Chart - Top 25 countries by LPI Score
+        st.subheader("🗺️ LPI Score - Top 25 Countries")
         
         # Limit to top 25 countries for readability
-        heatmap_countries = lpi_filtered.nlargest(25, 'LPI Score')
+        top_countries = lpi_filtered.nlargest(25, 'LPI Score').sort_values('LPI Score', ascending=True)
         
-        heatmap_data = heatmap_countries[lpi_components].values
-        
-        fig_heatmap = px.imshow(
-            heatmap_data,
-            labels=dict(x="LPI Component", y="Country", color="Score"),
-            y=heatmap_countries['Country'].tolist(),
-            x=['Customs', 'Infrastructure', 'Intl Shipments', 'Competence', 'Timeliness', 'Tracking'],
+        fig_bar = px.bar(
+            top_countries,
+            x='LPI Score',
+            y='Country',
+            orientation='h',
+            color='LPI Score',
             color_continuous_scale='RdYlGn',
-            aspect='auto',
-            title='LPI Components Heatmap - Top 25 Countries'
+            title='LPI Score - Top 25 Countries',
+            labels={'LPI Score': 'LPI Score (1-5)'},
+            text='LPI Score'
         )
-        fig_heatmap.update_layout(height=800)
-        st.plotly_chart(fig_heatmap, use_container_width=True)
+        fig_bar.update_traces(
+            texttemplate='%{text:.2f}',
+            textposition='outside',
+            hovertemplate='<b>%{y}</b><br>LPI Score: %{x:.2f}<extra></extra>'
+        )
+        fig_bar.update_layout(
+            height=800,
+            yaxis={'categoryorder': 'total ascending'},
+            showlegend=False,
+            xaxis_title='LPI Score',
+            yaxis_title='Country'
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
         
         st.markdown("---")
         
@@ -1414,23 +1411,44 @@ with tab8:
         )
         
         if len(merged_data) > 0:
-            fig_scatter = px.scatter(
-                merged_data,
-                x='LPI Score',
-                y='Spend_Billions',
-                size='Shoppers_Millions',
-                hover_name='Country',
-                title='LPI Score vs E-commerce Market Size',
-                labels={
-                    'LPI Score': 'LPI Score (1-5)',
-                    'Spend_Billions': 'Market Size ($B)',
-                    'Shoppers_Millions': 'Shoppers (M)'
-                },
-                color='LPI Score',
-                color_continuous_scale='Viridis'
-            )
-            fig_scatter.update_layout(height=600)
-            st.plotly_chart(fig_scatter, use_container_width=True)
+            # Add tabs for different views
+            tab1, tab2 = st.tabs(["📊 Scatter Plot", "📋 Table View"])
+            
+            with tab1:
+                fig_scatter = px.scatter(
+                    merged_data,
+                    x='LPI Score',
+                    y='Spend_Billions',
+                    size='Shoppers_Millions',
+                    hover_name='Country',
+                    title='LPI Score vs E-commerce Market Size',
+                    labels={
+                        'LPI Score': 'LPI Score (1-5)',
+                        'Spend_Billions': 'Market Size ($B)',
+                        'Shoppers_Millions': 'Shoppers (M)'
+                    },
+                    color='LPI Score',
+                    color_continuous_scale='Viridis'
+                )
+                fig_scatter.update_layout(height=600)
+                st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            with tab2:
+                # Create a formatted table view
+                display_data = merged_data[['Country', 'LPI Score', 'Spend_Billions', 'Shoppers_Millions']].copy()
+                display_data = display_data.sort_values('LPI Score', ascending=False)
+                display_data['LPI Score'] = display_data['LPI Score'].round(2)
+                display_data['Spend_Billions'] = display_data['Spend_Billions'].round(2)
+                display_data['Shoppers_Millions'] = display_data['Shoppers_Millions'].round(1)
+                display_data.columns = ['Country', 'LPI Score', 'Market Size ($B)', 'Shoppers (M)']
+                
+                # Style the dataframe
+                st.dataframe(
+                    display_data,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=600
+                )
             
             st.info("""
             **💡 Key Insight**: Strong correlation between LPI scores and market size suggests that
@@ -1451,7 +1469,7 @@ with tab8:
         lpi_table = lpi_filtered[display_cols].sort_values('LPI Score', ascending=False).reset_index(drop=True)
         
         st.dataframe(
-            lpi_table.style.background_gradient(subset=['LPI Score'], cmap='RdYlGn', vmin=1, vmax=5),
+            lpi_table,
             use_container_width=True,
             height=400
         )
