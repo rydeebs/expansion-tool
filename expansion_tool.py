@@ -1475,79 +1475,78 @@ with tab8:
         
         st.markdown("---")
         
-        # Scatter plot: LPI vs Market Size WITH REGION FILTER
-        st.subheader("💡 LPI Score vs Market Size")
+        # LPI Metrics filtered by Business Region
+        st.subheader("📊 LPI Metrics by Business Region")
         
-        # Region filter for scatter plot
-        col_scatter1, col_scatter2 = st.columns(2)
-        
-        with col_scatter1:
-            scatter_regions = ['All'] + sorted(lpi_df['Business Region'].dropna().unique().tolist())
-            selected_scatter_region = st.selectbox(
+        # Business Region filter
+        if 'Business Region' in lpi_df.columns:
+            available_regions = ['All'] + sorted(lpi_df['Business Region'].dropna().unique().tolist())
+            selected_lpi_region = st.selectbox(
                 "Filter by Business Region",
-                scatter_regions,
-                key='scatter_region_filter'
+                available_regions,
+                key='lpi_metrics_region_filter'
             )
-        
-        # Merge LPI data with market data
-        merged_data = pd.merge(
-            lpi_df,  # Use full lpi_df for merging
-            df_filtered[['Country', 'Spend_Billions', 'Shoppers_Millions']],
-            on='Country',
-            how='inner'
-        )
-        
-        # Apply scatter region filter
-        if selected_scatter_region != 'All':
-            merged_data_filtered = merged_data[merged_data['Business Region'] == selected_scatter_region]
-        else:
-            merged_data_filtered = merged_data
-        
-        if len(merged_data_filtered) > 0:
-            with col_scatter2:
-                st.metric("Countries in View", len(merged_data_filtered))
             
-            fig_scatter = px.scatter(
-                merged_data_filtered,
-                x='LPI Score',
-                y='Spend_Billions',
-                size='Shoppers_Millions',
-                hover_name='Country',
-                hover_data=['Business Region', 'World Bank Region'],
-                title=f'LPI Score vs E-commerce Market Size{" - " + selected_scatter_region if selected_scatter_region != "All" else ""}',
-                labels={
-                    'LPI Score': 'LPI Score (1-5)',
-                    'Spend_Billions': 'Market Size ($B)',
-                    'Shoppers_Millions': 'Shoppers (M)'
-                },
-                color='Business Region',
-                color_discrete_sequence=['#175CFF', '#52C4FF', '#FF8030', '#FFD61A']
-            )
-            fig_scatter.update_layout(height=600)
-            st.plotly_chart(fig_scatter, use_container_width=True)
-            
-            # Regional statistics for scatter
-            if selected_scatter_region != 'All':
-                region_avg_lpi = merged_data_filtered['LPI Score'].mean()
-                region_avg_market = merged_data_filtered['Spend_Billions'].mean()
-                
-                st.info(f"""
-                **💡 {selected_scatter_region} Insights**:
-                - Average LPI Score: **{region_avg_lpi:.2f}**
-                - Average Market Size: **${region_avg_market:.1f}B**
-                - Countries analyzed: **{len(merged_data_filtered)}**
-                
-                Strong correlation between LPI scores and market size suggests that better logistics 
-                infrastructure supports larger e-commerce markets.
-                """)
+            # Filter LPI data by selected region
+            if selected_lpi_region != 'All':
+                lpi_filtered_by_region = lpi_df[lpi_df['Business Region'] == selected_lpi_region].copy()
             else:
-                st.info("""
-                **💡 Key Insight**: Strong correlation between LPI scores and market size suggests that
-                better logistics infrastructure supports larger e-commerce markets. Countries with higher
-                LPI scores typically have more efficient supply chains and faster delivery times.
-                """)
+                lpi_filtered_by_region = lpi_df.copy()
+            
+            # Show summary metrics
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                avg_lpi = lpi_filtered_by_region['LPI Score'].mean()
+                st.metric("Average LPI Score", f"{avg_lpi:.2f}")
+            
+            with col2:
+                top_country = lpi_filtered_by_region.nlargest(1, 'LPI Score')
+                if len(top_country) > 0:
+                    st.metric("Top Performer", top_country['Country'].values[0])
+            
+            with col3:
+                total_countries = len(lpi_filtered_by_region)
+                st.metric("Total Countries", total_countries)
+            
+            with col4:
+                if selected_lpi_region != 'All':
+                    st.metric("Business Region", selected_lpi_region)
+                else:
+                    unique_regions = lpi_filtered_by_region['Business Region'].nunique()
+                    st.metric("Regions", unique_regions)
+            
+            st.markdown("---")
+            
+            # Display filtered LPI data table
+            display_cols = ['Country']
+            
+            # Add region columns if available
+            if 'Business Region' in lpi_filtered_by_region.columns:
+                display_cols.append('Business Region')
+            if 'World Bank Region' in lpi_filtered_by_region.columns:
+                display_cols.append('World Bank Region')
+            if 'ISO2' in lpi_filtered_by_region.columns:
+                display_cols.append('ISO2')
+            
+            # Add LPI scores
+            display_cols.extend(['LPI Score', 'LPI Grouped Rank', 
+                               'Customs Score', 'Infrastructure Score', 'International Shipments Score',
+                               'Logistics Competence and Quality Score', 'Timeliness Score', 
+                               'Tracking and Tracing Score'])
+            
+            # Only include columns that exist
+            display_cols = [col for col in display_cols if col in lpi_filtered_by_region.columns]
+            
+            lpi_table_filtered = lpi_filtered_by_region[display_cols].sort_values('LPI Score', ascending=False).reset_index(drop=True)
+            
+            st.dataframe(
+                lpi_table_filtered,
+                use_container_width=True,
+                height=400
+            )
         else:
-            st.warning("No data available for the selected region filter.")
+            st.warning("Business Region column not found in LPI data.")
         
         st.markdown("---")
         
@@ -1570,4 +1569,3 @@ with tab8:
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Data Source**: Global E-commerce Market Research 2025")
-st.sidebar.markdown("**Last Updated**: December 2024")
