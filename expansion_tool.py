@@ -140,8 +140,8 @@ def load_data():
 # Load LPI Metrics data
 @st.cache_data
 def load_lpi_data():
-    """Load and clean LPI Metrics data (now includes Business Region, World Bank Region, and ISO2)"""
-    lpi_df = pd.read_csv('LPI Metrics.csv')
+    """Load and clean LPI Metrics data"""
+    lpi_df = pd.read_csv('LPI_Metrics.csv')
     
     # Clean column names - remove extra spaces
     lpi_df.columns = lpi_df.columns.str.strip()
@@ -149,53 +149,19 @@ def load_lpi_data():
     # Rename 'Economy' to 'Country' for consistency
     lpi_df = lpi_df.rename(columns={'Economy': 'Country'})
     
+    # Ensure numeric columns are numeric
+    numeric_cols = ['LPI Score', 'Customs Score', 'Infrastructure Score', 
+                   'International Shipments Score', 'Logistics Competence and Quality Score',
+                   'Timeliness Score', 'Tracking and Tracing Score']
+    
+    for col in numeric_cols:
+        if col in lpi_df.columns:
+            lpi_df[col] = pd.to_numeric(lpi_df[col], errors='coerce')
+    
     return lpi_df
 
-# Helper function to format numbers with commas
-def format_number_with_commas(value, format_type='default'):
-    """
-    Format numbers with comma separators for thousands.
-    
-    Args:
-        value: The numeric value to format
-        format_type: 'default', 'M' (millions), 'B' (billions), 'currency', 'percent'
-    
-    Returns:
-        Formatted string with commas
-    """
-    if pd.isna(value):
-        return ''
-    
-    # Format the number part with commas
-    if format_type == 'M':
-        # For millions: 3077.9 -> "3,077.9M"
-        formatted = f"{value:,.1f}M"
-    elif format_type == 'B':
-        # For billions: 3077.9 -> "$3,077.9B"
-        formatted = f"${value:,.1f}B"
-    elif format_type == 'currency':
-        # For currency: 3077.9 -> "$3,077.90"
-        formatted = f"${value:,.0f}"
-    elif format_type == 'percent':
-        # For percentages: 3077.9 -> "3,077.9%"
-        formatted = f"{value:,.1f}%"
-    elif format_type == 'decimal':
-        # For decimals: 3077.9 -> "3,077.9"
-        formatted = f"{value:,.1f}"
-    elif format_type == 'integer':
-        # For integers: 3077 -> "3,077"
-        formatted = f"{value:,.0f}"
-    else:
-        # Default: just add commas
-        if isinstance(value, float) and value % 1 == 0:
-            formatted = f"{value:,.0f}"
-        else:
-            formatted = f"{value:,.1f}"
-    
-    return formatted
-
 # Function to create PDF export
-def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_region):
+def create_pdf_report(df_export, selected_countries_list):
     """Create a comprehensive PDF report with all tabs"""
     
     if not PDF_AVAILABLE:
@@ -338,10 +304,10 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
     
     summary_data = [
         ['Metric', 'Value'],
-        ['Total E-commerce Shoppers', format_number_with_commas(df_export['Shoppers_Millions'].sum(), 'M')],
-        ['Total Market Size', format_number_with_commas(df_export['Spend_Billions'].sum(), 'B')],
-        ['Average Revenue per Shopper', format_number_with_commas(df_export['Revenue_Per_Shopper'].mean(), 'currency')],
-        ['Average YoY Growth Rate', format_number_with_commas(df_export['Spend_YoY'].mean(), 'percent')]
+        ['Total E-commerce Shoppers', f"{df_export['Shoppers_Millions'].sum():.1f}M"],
+        ['Total Market Size', f"${df_export['Spend_Billions'].sum():.1f}B"],
+        ['Average Revenue per Shopper', f"${df_export['Revenue_Per_Shopper'].mean():.0f}"],
+        ['Average YoY Growth Rate', f"{df_export['Spend_YoY'].mean():.1f}%"]
     ]
     
     summary_table = Table(summary_data, colWidths=[3.5*inch, 2.5*inch])
@@ -372,10 +338,10 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
     for idx, row in top_markets.iterrows():
         table_data.append([
             row['Country'],
-            format_number_with_commas(row['Spend_Billions'], 'B'),
-            format_number_with_commas(row['Shoppers_Millions'], 'M'),
-            format_number_with_commas(row['Revenue_Per_Shopper'], 'currency'),
-            format_number_with_commas(row['Spend_YoY'], 'percent')
+            f"${row['Spend_Billions']:.1f}B",
+            f"{row['Shoppers_Millions']:.1f}M",
+            f"${row['Revenue_Per_Shopper']:.0f}",
+            f"{row['Spend_YoY']:.1f}%"
         ])
     
     markets_table = Table(table_data, colWidths=[1.8*inch, 1.2*inch, 1.1*inch, 1.0*inch, 1.0*inch])
@@ -410,9 +376,9 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
     for _, row in region_summary.iterrows():
         region_data.append([
             row['Business_Region'],
-            format_number_with_commas(row['Spend_Billions'], 'B'),
-            format_number_with_commas(row['Shoppers_Millions'], 'M'),
-            format_number_with_commas(row['Country'], 'integer')
+            f"${row['Spend_Billions']:.1f}B",
+            f"{row['Shoppers_Millions']:.1f}M",
+            str(row['Country'])
         ])
     
     region_table = Table(region_data, colWidths=[2.2*inch, 1.6*inch, 1.6*inch, 1.0*inch])
@@ -436,8 +402,8 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
     story.append(Paragraph("Shopper Growth Analysis", h4_style))
     story.append(Spacer(1, 0.15*inch))
     
-    story.append(Paragraph(f"Total E-commerce Shoppers: <b>{format_number_with_commas(df_export['Shoppers_Millions'].sum(), 'M')}</b>", body_style))
-    story.append(Paragraph(f"Average Shopper Growth Rate: <b>{format_number_with_commas(df_export['Shoppers_YoY'].mean(), 'percent')}</b>", body_style))
+    story.append(Paragraph(f"Total E-commerce Shoppers: <b>{df_export['Shoppers_Millions'].sum():.1f}M</b>", body_style))
+    story.append(Paragraph(f"Average Shopper Growth Rate: <b>{df_export['Shoppers_YoY'].mean():.1f}%</b>", body_style))
     story.append(Spacer(1, 0.2*inch))
     
     story.append(Paragraph("Fastest Growing Markets", h5_style))
@@ -446,8 +412,8 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
     for _, row in top_growth.iterrows():
         growth_data.append([
             row['Country'],
-            format_number_with_commas(row['Shoppers_YoY'], 'percent'),
-            format_number_with_commas(row['Shoppers_Millions'], 'M')
+            f"{row['Shoppers_YoY']:.1f}%",
+            f"{row['Shoppers_Millions']:.1f}M"
         ])
     
     growth_table = Table(growth_data, colWidths=[2.5*inch, 1.5*inch, 1.8*inch])
@@ -477,7 +443,7 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
     top_bnpl = df_export.nlargest(5, 'Payment_BNPL')[['Country', 'Payment_BNPL']]
     bnpl_data = [['Country', 'BNPL Share']]
     for _, row in top_bnpl.iterrows():
-        bnpl_data.append([row['Country'], format_number_with_commas(row['Payment_BNPL'], 'percent')])
+        bnpl_data.append([row['Country'], f"{row['Payment_BNPL']:.1f}%"])
     
     bnpl_table = Table(bnpl_data, colWidths=[3.5*inch, 2*inch])
     bnpl_table.setStyle(TableStyle([
@@ -504,7 +470,7 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
     top_a2a = df_export.nlargest(5, 'Payment_A2A')[['Country', 'Payment_A2A']]
     a2a_data = [['Country', 'A2A Share']]
     for _, row in top_a2a.iterrows():
-        a2a_data.append([row['Country'], format_number_with_commas(row['Payment_A2A'], 'percent')])
+        a2a_data.append([row['Country'], f"{row['Payment_A2A']:.1f}%"])
     
     a2a_table = Table(a2a_data, colWidths=[3.5*inch, 2*inch])
     a2a_table.setStyle(TableStyle([
@@ -536,7 +502,7 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
         top_cat = df_export.nlargest(5, category)[['Country', category]]
         cat_data = [['Country', 'Spend']]
         for _, row in top_cat.iterrows():
-            cat_data.append([row['Country'], format_number_with_commas(row[category], 'B')])
+            cat_data.append([row['Country'], f"${row[category]:.1f}B"])
         
         cat_table = Table(cat_data, colWidths=[3.5*inch, 2*inch])
         cat_table.setStyle(TableStyle([
@@ -554,118 +520,6 @@ def create_pdf_report(df_export, selected_countries_list, lpi_data, selected_reg
         ]))
         story.append(cat_table)
         story.append(Spacer(1, 0.15*inch))
-    
-    # LPI Metrics Section
-    story.append(PageBreak())
-    story.append(Paragraph("Logistics Performance Index (LPI) Metrics", h3_style))
-    story.append(Spacer(1, 0.2*inch))
-    
-    # Filter LPI data for selected countries
-    lpi_export = lpi_data[lpi_data['Country'].isin(selected_countries_list)].copy()
-    
-    # If Business Region is selected, also filter by Business Region
-    if selected_region != 'All':
-        if 'Business Region' in lpi_export.columns:
-            lpi_export = lpi_export[lpi_export['Business Region'] == selected_region].copy()
-        elif 'Business_Region' in lpi_export.columns:
-            lpi_export = lpi_export[lpi_export['Business_Region'] == selected_region].copy()
-    
-    if len(lpi_export) > 0:
-        story.append(Paragraph("The Logistics Performance Index (LPI) measures logistics performance across countries. Higher scores indicate better logistics infrastructure and efficiency (scale: 1-5).", body_style))
-        story.append(Spacer(1, 0.2*inch))
-        
-        # LPI Summary Metrics
-        story.append(Paragraph("LPI Summary", h4_style))
-        story.append(Spacer(1, 0.1*inch))
-        
-        lpi_summary_data = [
-            ['Metric', 'Value'],
-            ['Average LPI Score', f"{lpi_export['LPI Score'].mean():.2f}"],
-            ['Highest LPI Score', f"{lpi_export['LPI Score'].max():.2f}"],
-            ['Lowest LPI Score', f"{lpi_export['LPI Score'].min():.2f}"],
-            ['Number of Countries', str(len(lpi_export))]
-        ]
-        
-        lpi_summary_table = Table(lpi_summary_data, colWidths=[3.5*inch, 2.5*inch])
-        lpi_summary_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), cobalt),
-            ('TEXTCOLOR', (0, 0), (-1, 0), white),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 13),
-            ('FONTSIZE', (0, 1), (-1, -1), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-            ('TOPPADDING', (0, 0), (-1, -1), 10),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F5F5F5')),
-            ('LINEBELOW', (0, 0), (-1, 0), 2, cobalt),
-            ('GRID', (0, 0), (-1, -1), 0.5, cloud)
-        ]))
-        story.append(lpi_summary_table)
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Top LPI Countries
-        story.append(Paragraph("Top Countries by LPI Score", h4_style))
-        story.append(Spacer(1, 0.1*inch))
-        
-        top_lpi = lpi_export.nlargest(15, 'LPI Score')[['Country', 'LPI Score', 'Customs Score', 'Infrastructure Score', 'Timeliness Score']]
-        
-        lpi_table_data = [['Country', 'LPI Score', 'Customs', 'Infrastructure', 'Timeliness']]
-        for _, row in top_lpi.iterrows():
-            lpi_table_data.append([
-                row['Country'],
-                f"{row['LPI Score']:.2f}",
-                f"{row['Customs Score']:.2f}",
-                f"{row['Infrastructure Score']:.2f}",
-                f"{row['Timeliness Score']:.2f}"
-            ])
-        
-        lpi_table = Table(lpi_table_data, colWidths=[1.8*inch, 0.9*inch, 0.9*inch, 1.0*inch, 0.9*inch])
-        lpi_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), sky),
-            ('TEXTCOLOR', (0, 0), (-1, 0), denim),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('FONTSIZE', (0, 1), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, colors.HexColor('#F9F9F9')]),
-            ('LINEBELOW', (0, 0), (-1, 0), 2, sky),
-            ('GRID', (0, 0), (-1, -1), 0.5, cloud)
-        ]))
-        story.append(lpi_table)
-        story.append(Spacer(1, 0.3*inch))
-        
-        # LPI Component Averages
-        story.append(Paragraph("Average LPI Component Scores", h4_style))
-        story.append(Spacer(1, 0.1*inch))
-        
-        lpi_components = ['Customs Score', 'Infrastructure Score', 'International Shipments Score',
-                         'Logistics Competence and Quality Score', 'Timeliness Score', 'Tracking and Tracing Score']
-        component_labels = ['Customs', 'Infrastructure', 'Intl Shipments', 'Competence', 'Timeliness', 'Tracking']
-        
-        component_data = [['Component', 'Average Score']]
-        for comp, label in zip(lpi_components, component_labels):
-            if comp in lpi_export.columns:
-                component_data.append([label, f"{lpi_export[comp].mean():.2f}"])
-        
-        component_table = Table(component_data, colWidths=[3.5*inch, 2*inch])
-        component_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), carrot),
-            ('TEXTCOLOR', (0, 0), (-1, 0), white),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('FONTSIZE', (0, 1), (-1, -1), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [white, colors.HexColor('#FFF5F0')]),
-            ('LINEBELOW', (0, 0), (-1, 0), 2, carrot),
-            ('GRID', (0, 0), (-1, -1), 0.5, cloud)
-        ]))
-        story.append(component_table)
-    else:
-        story.append(Paragraph("No LPI data available for the selected countries.", body_style))
     
     # Footer on last page
     story.append(PageBreak())
@@ -736,7 +590,7 @@ st.sidebar.write(f"PDF_AVAILABLE: {PDF_AVAILABLE}")
 if PDF_AVAILABLE:
     if st.sidebar.button("Generate PDF Report", type="primary", use_container_width=True):
         with st.spinner("Generating PDF report..."):
-            pdf_buffer = create_pdf_report(df_filtered, selected_countries if selected_countries else df_filtered['Country'].tolist(), lpi_df, selected_region)
+            pdf_buffer = create_pdf_report(df_filtered, selected_countries if selected_countries else df_filtered['Country'].tolist())
             
             if pdf_buffer:
                 st.sidebar.download_button(
@@ -786,19 +640,19 @@ with tab1:
     
     with col1:
         total_shoppers = df_filtered['Shoppers_Millions'].sum()
-        st.metric("Total Shoppers", format_number_with_commas(total_shoppers, 'M'))
+        st.metric("Total Shoppers", f"{total_shoppers:.1f}M")
     
     with col2:
         total_spend = df_filtered['Spend_Billions'].sum()
-        st.metric("Total Market Size", format_number_with_commas(total_spend, 'B'))
+        st.metric("Total Market Size", f"${total_spend:.1f}B")
     
     with col3:
         avg_revenue = df_filtered['Revenue_Per_Shopper'].mean()
-        st.metric("Avg Revenue/Shopper", format_number_with_commas(avg_revenue, 'currency'))
+        st.metric("Avg Revenue/Shopper", f"${avg_revenue:.0f}")
     
     with col4:
         avg_growth = df_filtered['Spend_YoY'].mean()
-        st.metric("Avg Growth Rate", format_number_with_commas(avg_growth, 'percent'))
+        st.metric("Avg Growth Rate", f"{avg_growth:.1f}%")
     
     st.markdown("---")
     
@@ -807,10 +661,10 @@ with tab1:
     
     top_markets = df_filtered.nlargest(10, 'Spend_Billions')[['Country', 'Spend_Billions', 'Shoppers_Millions', 'Revenue_Per_Shopper', 'Spend_YoY']]
     top_markets_display = top_markets.copy()
-    top_markets_display['Spend_Billions'] = top_markets_display['Spend_Billions'].apply(lambda x: format_number_with_commas(x, 'B'))
-    top_markets_display['Shoppers_Millions'] = top_markets_display['Shoppers_Millions'].apply(lambda x: format_number_with_commas(x, 'M'))
-    top_markets_display['Revenue_Per_Shopper'] = top_markets_display['Revenue_Per_Shopper'].apply(lambda x: format_number_with_commas(x, 'currency'))
-    top_markets_display['Spend_YoY'] = top_markets_display['Spend_YoY'].apply(lambda x: format_number_with_commas(x, 'percent'))
+    top_markets_display['Spend_Billions'] = top_markets_display['Spend_Billions'].apply(lambda x: f"${x:.1f}B")
+    top_markets_display['Shoppers_Millions'] = top_markets_display['Shoppers_Millions'].apply(lambda x: f"{x:.1f}M")
+    top_markets_display['Revenue_Per_Shopper'] = top_markets_display['Revenue_Per_Shopper'].apply(lambda x: f"${x:.0f}")
+    top_markets_display['Spend_YoY'] = top_markets_display['Spend_YoY'].apply(lambda x: f"{x:.1f}%")
     top_markets_display.columns = ['Country', 'Market Size', 'Shoppers', 'AOV', 'Growth']
     
     st.dataframe(top_markets_display, use_container_width=True, hide_index=True)
@@ -876,16 +730,16 @@ with tab3:
     
     with col1:
         total_shoppers = df_filtered['Shoppers_Millions'].sum()
-        st.metric("Total Shoppers", format_number_with_commas(total_shoppers, 'M'))
+        st.metric("Total Shoppers", f"{total_shoppers:.1f}M")
     
     with col2:
         avg_growth = df_filtered['Shoppers_YoY'].mean()
-        st.metric("Avg Shopper Growth", format_number_with_commas(avg_growth, 'percent'))
+        st.metric("Avg Shopper Growth", f"{avg_growth:.1f}%")
     
     with col3:
         fastest_growth = df_filtered.nlargest(1, 'Shoppers_YoY')
         if not fastest_growth.empty:
-            st.metric("Fastest Growing", f"{fastest_growth.iloc[0]['Country']}", format_number_with_commas(fastest_growth.iloc[0]['Shoppers_YoY'], 'percent'))
+            st.metric("Fastest Growing", f"{fastest_growth.iloc[0]['Country']}", f"{fastest_growth.iloc[0]['Shoppers_YoY']:.1f}%")
     
     st.markdown("---")
     
@@ -959,19 +813,19 @@ with tab4:
     
     with col1:
         total_spend = df_filtered['Spend_Billions'].sum()
-        st.metric("Total Market Size", format_number_with_commas(total_spend, 'B'))
+        st.metric("Total Market Size", f"${total_spend:.1f}B")
     
     with col2:
         avg_spend_growth = df_filtered['Spend_YoY'].mean()
-        st.metric("Avg Spend Growth", format_number_with_commas(avg_spend_growth, 'percent'))
+        st.metric("Avg Spend Growth", f"{avg_spend_growth:.1f}%")
     
     with col3:
         avg_aov = df_filtered['Revenue_Per_Shopper'].mean()
-        st.metric("Avg AOV", format_number_with_commas(avg_aov, 'currency'))
+        st.metric("Avg AOV", f"${avg_aov:.0f}")
     
     with col4:
         avg_aov_growth = df_filtered['Revenue_YoY'].mean()
-        st.metric("Avg AOV Growth", format_number_with_commas(avg_aov_growth, 'percent'))
+        st.metric("Avg AOV Growth", f"{avg_aov_growth:.1f}%")
     
     st.markdown("---")
     
@@ -1132,14 +986,14 @@ with tab5:
         st.subheader("Category Stats")
         
         total_category_spend = df_filtered[selected_category].sum()
-        st.metric("Total Category Spend", format_number_with_commas(total_category_spend, 'B'))
+        st.metric("Total Category Spend", f"${total_category_spend:.1f}B")
         
         avg_category_spend = df_filtered[selected_category].mean()
-        st.metric("Avg per Country", format_number_with_commas(avg_category_spend, 'B'))
+        st.metric("Avg per Country", f"${avg_category_spend:.1f}B")
         
         top_market = df_filtered.nlargest(1, selected_category)
         if not top_market.empty:
-            st.metric("Top Market", top_market.iloc[0]['Country'], format_number_with_commas(top_market.iloc[0][selected_category], 'B'))
+            st.metric("Top Market", top_market.iloc[0]['Country'], f"${top_market.iloc[0][selected_category]:.1f}B")
     
     st.markdown("---")
     
@@ -1226,7 +1080,7 @@ with tab6:
         st.subheader("🔥 Top BNPL Markets")
         top_bnpl = df_filtered.nlargest(10, 'Payment_BNPL')[['Country', 'Payment_BNPL']]
         top_bnpl_display = top_bnpl.copy()
-        top_bnpl_display['Payment_BNPL'] = top_bnpl_display['Payment_BNPL'].apply(lambda x: format_number_with_commas(x, 'percent'))
+        top_bnpl_display['Payment_BNPL'] = top_bnpl_display['Payment_BNPL'].apply(lambda x: f"{x:.1f}%")
         top_bnpl_display.columns = ['Country', 'BNPL Share']
         st.dataframe(top_bnpl_display, hide_index=True, use_container_width=True)
         
@@ -1236,7 +1090,7 @@ with tab6:
         st.subheader("📱 Top Mobile Wallet Markets")
         top_mobile = df_filtered.nlargest(10, 'Payment_Mobile_Wallets')[['Country', 'Payment_Mobile_Wallets']]
         top_mobile_display = top_mobile.copy()
-        top_mobile_display['Payment_Mobile_Wallets'] = top_mobile_display['Payment_Mobile_Wallets'].apply(lambda x: format_number_with_commas(x, 'percent'))
+        top_mobile_display['Payment_Mobile_Wallets'] = top_mobile_display['Payment_Mobile_Wallets'].apply(lambda x: f"{x:.1f}%")
         top_mobile_display.columns = ['Country', 'Mobile Wallet Share']
         st.dataframe(top_mobile_display, hide_index=True, use_container_width=True)
         
@@ -1357,20 +1211,38 @@ with tab8:
     Higher scores indicate better logistics infrastructure and efficiency (scale: 1-5).
     """)
     
-    # Filter LPI data to only countries in our main dataset and respect Business Region filter
-    lpi_filtered = lpi_df[lpi_df['Country'].isin(df_filtered['Country'])].copy()
+    # Filters for LPI data
+    st.subheader("🔍 Filter LPI Data")
     
-    # If Business Region is selected, also filter by Business Region
-    # Check for both 'Business Region' (from CSV) and 'Business_Region' (from df_filtered merge)
-    if selected_region != 'All':
-        if 'Business Region' in lpi_filtered.columns:
-            lpi_filtered = lpi_filtered[lpi_filtered['Business Region'] == selected_region].copy()
-        elif 'Business_Region' in lpi_filtered.columns:
-            lpi_filtered = lpi_filtered[lpi_filtered['Business_Region'] == selected_region].copy()
+    col_filter1, col_filter2 = st.columns(2)
+    
+    with col_filter1:
+        # Business Region filter
+        business_regions_lpi = ['All'] + sorted(lpi_df['Business Region'].dropna().unique().tolist())
+        selected_business_region_lpi = st.selectbox("Select Business Region", business_regions_lpi, key='lpi_business_region')
+    
+    with col_filter2:
+        # World Bank Region filter
+        wb_regions = ['All'] + sorted(lpi_df['World Bank Region'].dropna().unique().tolist())
+        selected_wb_region = st.selectbox("Select World Bank Region", wb_regions, key='lpi_wb_region')
+    
+    # Apply filters
+    lpi_filtered = lpi_df.copy()
+    
+    if selected_business_region_lpi != 'All':
+        lpi_filtered = lpi_filtered[lpi_filtered['Business Region'] == selected_business_region_lpi]
+    
+    if selected_wb_region != 'All':
+        lpi_filtered = lpi_filtered[lpi_filtered['World Bank Region'] == selected_wb_region]
+    
+    # Further filter to countries in main dataset selection
+    lpi_filtered = lpi_filtered[lpi_filtered['Country'].isin(df_filtered['Country'])].copy()
     
     if len(lpi_filtered) == 0:
-        st.warning("No LPI data available for selected countries")
+        st.warning("No LPI data available for selected filters")
     else:
+        st.info(f"📊 Showing data for **{len(lpi_filtered)} countries**")
+        
         # Key Metrics
         st.subheader("📊 Overall LPI Performance")
         
@@ -1394,6 +1266,42 @@ with tab8:
         
         st.markdown("---")
         
+        # Regional Summary (if not filtered to single region)
+        if selected_business_region_lpi == 'All':
+            st.subheader("🌍 Performance by Business Region")
+            
+            region_summary_lpi = lpi_filtered.groupby('Business Region').agg({
+                'LPI Score': 'mean',
+                'Customs Score': 'mean',
+                'Infrastructure Score': 'mean',
+                'Timeliness Score': 'mean',
+                'Country': 'count'
+            }).reset_index()
+            region_summary_lpi.columns = ['Business Region', 'Avg LPI Score', 'Avg Customs', 'Avg Infrastructure', 'Avg Timeliness', 'Countries']
+            region_summary_lpi = region_summary_lpi.sort_values('Avg LPI Score', ascending=False)
+            
+            fig_region_lpi = px.bar(
+                region_summary_lpi,
+                x='Business Region',
+                y='Avg LPI Score',
+                color='Avg LPI Score',
+                color_continuous_scale='RdYlGn',
+                title='Average LPI Score by Business Region',
+                text='Avg LPI Score'
+            )
+            fig_region_lpi.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+            fig_region_lpi.update_layout(height=400, showlegend=False)
+            st.plotly_chart(fig_region_lpi, use_container_width=True)
+            
+            # Display regional summary table
+            st.dataframe(
+                region_summary_lpi.style.background_gradient(subset=['Avg LPI Score'], cmap='RdYlGn', vmin=1, vmax=5),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            st.markdown("---")
+        
         # Overall LPI Ranking
         st.subheader("🏆 Overall LPI Rankings")
         
@@ -1409,7 +1317,8 @@ with tab8:
             labels={'LPI Score': 'LPI Score (1-5)', 'Country': ''},
             color='LPI Score',
             color_continuous_scale='RdYlGn',
-            text='LPI Score'
+            text='LPI Score',
+            hover_data=['Business Region', 'World Bank Region']
         )
         fig_lpi_bar.update_traces(texttemplate='%{text:.2f}', textposition='outside')
         fig_lpi_bar.update_layout(height=600, showlegend=False)
@@ -1438,7 +1347,7 @@ with tab8:
         selected_lpi_countries = st.multiselect(
             "Select countries to compare (up to 5)",
             lpi_countries_list,
-            default=lpi_countries_list[:3],
+            default=lpi_countries_list[:3] if len(lpi_countries_list) >= 3 else lpi_countries_list,
             max_selections=5
         )
         
@@ -1507,7 +1416,8 @@ with tab8:
                 orientation='h',
                 color=component_col,
                 color_continuous_scale='Greens',
-                text=component_col
+                text=component_col,
+                hover_data=['Business Region', 'World Bank Region']
             )
             fig_component.update_traces(texttemplate='%{text:.2f}', textposition='outside')
             fig_component.update_layout(height=500, showlegend=False)
@@ -1526,248 +1436,138 @@ with tab8:
             
             for stat, value in component_stats.items():
                 st.metric(stat, f"{value:.2f}")
+            
+            st.markdown("---")
+            
+            # Distribution histogram
+            fig_dist = px.histogram(
+                lpi_filtered,
+                x=component_col,
+                nbins=20,
+                title=f'{selected_component} Score Distribution',
+                labels={component_col: 'Score'},
+                color_discrete_sequence=['#175CFF']
+            )
+            fig_dist.update_layout(height=300)
+            st.plotly_chart(fig_dist, use_container_width=True)
         
         st.markdown("---")
         
-        # Horizontal Bar Chart - Top 25 countries by LPI Score
-        st.subheader("🗺️ LPI Score - Top 25 Countries")
+        # Heatmap - All components across countries
+        st.subheader("🗺️ LPI Components Heatmap")
         
         # Limit to top 25 countries for readability
-        top_countries = lpi_filtered.nlargest(25, 'LPI Score').sort_values('LPI Score', ascending=True)
+        heatmap_countries = lpi_filtered.nlargest(25, 'LPI Score')
         
-        fig_bar = px.bar(
-            top_countries,
-            x='LPI Score',
-            y='Country',
-            orientation='h',
-            color='LPI Score',
+        heatmap_data = heatmap_countries[lpi_components].values
+        
+        fig_heatmap = px.imshow(
+            heatmap_data,
+            labels=dict(x="LPI Component", y="Country", color="Score"),
+            y=heatmap_countries['Country'].tolist(),
+            x=['Customs', 'Infrastructure', 'Intl Shipments', 'Competence', 'Timeliness', 'Tracking'],
             color_continuous_scale='RdYlGn',
-            title='LPI Score - Top 25 Countries',
-            labels={'LPI Score': 'LPI Score (1-5)'},
-            text='LPI Score'
+            aspect='auto',
+            title='LPI Components Heatmap - Top 25 Countries'
         )
-        fig_bar.update_traces(
-            texttemplate='%{text:.2f}',
-            textposition='outside',
-            hovertemplate='<b>%{y}</b><br>LPI Score: %{x:.2f}<extra></extra>'
-        )
-        fig_bar.update_layout(
-            height=800,
-            yaxis={'categoryorder': 'total ascending'},
-            showlegend=False,
-            xaxis_title='LPI Score',
-            yaxis_title='Country'
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        fig_heatmap.update_layout(height=800)
+        st.plotly_chart(fig_heatmap, use_container_width=True)
         
         st.markdown("---")
         
-        # Scatter plot: LPI vs Market Size
+        # Scatter plot: LPI vs Market Size WITH REGION FILTER
         st.subheader("💡 LPI Score vs Market Size")
         
-        # Merge LPI data with market data
-        # Include Business_Region and World Bank Region from lpi_filtered (now in CSV)
-        merge_cols = ['Country', 'Spend_Billions', 'Shoppers_Millions']
+        # Region filter for scatter plot
+        col_scatter1, col_scatter2 = st.columns(2)
         
-        # Start with LPI data (which now includes Business Region, World Bank Region, ISO2)
-        # Note: CSV has "Business Region" with space, not "Business_Region" with underscore
-        lpi_merge_cols = ['Country']
-        if 'Business Region' in lpi_filtered.columns:
-            lpi_merge_cols.append('Business Region')
-        elif 'Business_Region' in lpi_filtered.columns:
-            lpi_merge_cols.append('Business_Region')
-        if 'World Bank Region' in lpi_filtered.columns:
-            lpi_merge_cols.append('World Bank Region')
-        if 'ISO2' in lpi_filtered.columns:
-            lpi_merge_cols.append('ISO2')
+        with col_scatter1:
+            scatter_regions = ['All'] + sorted(lpi_df['Business Region'].dropna().unique().tolist())
+            selected_scatter_region = st.selectbox(
+                "Filter by Business Region",
+                scatter_regions,
+                key='scatter_region_filter'
+            )
         
         # Merge LPI data with market data
         merged_data = pd.merge(
-            lpi_filtered[lpi_merge_cols],
-            df_filtered[merge_cols],
+            lpi_df,  # Use full lpi_df for merging
+            df_filtered[['Country', 'Spend_Billions', 'Shoppers_Millions']],
             on='Country',
-            how='inner',
-            suffixes=('', '_drop')
+            how='inner'
         )
         
-        # Drop any duplicate columns created by merge
-        merged_data = merged_data.loc[:, ~merged_data.columns.str.endswith('_drop')]
+        # Apply scatter region filter
+        if selected_scatter_region != 'All':
+            merged_data_filtered = merged_data[merged_data['Business Region'] == selected_scatter_region]
+        else:
+            merged_data_filtered = merged_data
         
-        # Standardize column name - ensure 'Business Region' exists (with space)
-        if 'Business_Region' in merged_data.columns and 'Business Region' not in merged_data.columns:
-            merged_data = merged_data.rename(columns={'Business_Region': 'Business Region'})
-        
-        # If Business Region not in merged_data, try to get it from df_filtered
-        if 'Business Region' not in merged_data.columns and 'Business_Region' not in merged_data.columns:
-            if 'Business_Region' in df_filtered.columns:
-                region_map = df_filtered[['Country', 'Business_Region']].drop_duplicates(subset=['Country'])
-                merged_data = merged_data.merge(region_map, on='Country', how='left')
-                if 'Business_Region' in merged_data.columns:
-                    merged_data = merged_data.rename(columns={'Business_Region': 'Business Region'})
-        
-        if len(merged_data) > 0:
-            # Region filter - allow filtering by Business Region or World Bank Region
-            col1, col2 = st.columns(2)
+        if len(merged_data_filtered) > 0:
+            with col_scatter2:
+                st.metric("Countries in View", len(merged_data_filtered))
             
-            selected_lpi_region = 'All'
-            selected_wb_region = 'All'
+            fig_scatter = px.scatter(
+                merged_data_filtered,
+                x='LPI Score',
+                y='Spend_Billions',
+                size='Shoppers_Millions',
+                hover_name='Country',
+                hover_data=['Business Region', 'World Bank Region'],
+                title=f'LPI Score vs E-commerce Market Size{" - " + selected_scatter_region if selected_scatter_region != "All" else ""}',
+                labels={
+                    'LPI Score': 'LPI Score (1-5)',
+                    'Spend_Billions': 'Market Size ($B)',
+                    'Shoppers_Millions': 'Shoppers (M)'
+                },
+                color='Business Region',
+                color_discrete_sequence=['#175CFF', '#52C4FF', '#FF8030', '#FFD61A']
+            )
+            fig_scatter.update_layout(height=600)
+            st.plotly_chart(fig_scatter, use_container_width=True)
             
-            # Determine the Business Region column name to use
-            br_col_name = None
-            if 'Business Region' in merged_data.columns:
-                br_col_name = 'Business Region'
-            elif 'Business_Region' in merged_data.columns:
-                br_col_name = 'Business_Region'
-            
-            with col1:
-                if br_col_name:
-                    unique_regions = merged_data[br_col_name].dropna().unique().tolist()
-                    if len(unique_regions) > 0:
-                        available_regions = ['All'] + sorted(unique_regions)
-                        selected_lpi_region = st.selectbox(
-                            "Filter by Business Region",
-                            available_regions,
-                            key='lpi_business_region_filter'
-                        )
-            
-            with col2:
-                if 'World Bank Region' in merged_data.columns:
-                    unique_wb_regions = merged_data['World Bank Region'].dropna().unique().tolist()
-                    if len(unique_wb_regions) > 0:
-                        available_wb_regions = ['All'] + sorted(unique_wb_regions)
-                        selected_wb_region = st.selectbox(
-                            "Filter by World Bank Region",
-                            available_wb_regions,
-                            key='lpi_wb_region_filter'
-                        )
-            
-            # Apply filters
-            if selected_lpi_region != 'All' and br_col_name:
-                merged_data = merged_data[merged_data[br_col_name] == selected_lpi_region].copy()
-            
-            if selected_wb_region != 'All' and 'World Bank Region' in merged_data.columns:
-                merged_data = merged_data[merged_data['World Bank Region'] == selected_wb_region].copy()
-            
-            if len(merged_data) > 0:
-                # Add tabs for different views
-                tab1, tab2 = st.tabs(["📊 Scatter Plot", "📋 Table View"])
+            # Regional statistics for scatter
+            if selected_scatter_region != 'All':
+                region_avg_lpi = merged_data_filtered['LPI Score'].mean()
+                region_avg_market = merged_data_filtered['Spend_Billions'].mean()
                 
-                with tab1:
-                    # Determine color column - use Business Region if available and multiple regions, otherwise use LPI Score
-                    # Re-check the Business Region column name after filtering
-                    br_col_after_filter = None
-                    if 'Business Region' in merged_data.columns:
-                        br_col_after_filter = 'Business Region'
-                    elif 'Business_Region' in merged_data.columns:
-                        br_col_after_filter = 'Business_Region'
-                    
-                    if br_col_after_filter and selected_lpi_region == 'All' and selected_wb_region == 'All' and merged_data[br_col_after_filter].nunique() > 1:
-                        color_col = br_col_after_filter
-                        color_scale = None
-                    elif 'World Bank Region' in merged_data.columns and selected_lpi_region == 'All' and selected_wb_region == 'All' and merged_data['World Bank Region'].nunique() > 1:
-                        color_col = 'World Bank Region'
-                        color_scale = None
-                    else:
-                        color_col = 'LPI Score'
-                        color_scale = 'Viridis'
-                    
-                    fig_scatter = px.scatter(
-                        merged_data,
-                        x='LPI Score',
-                        y='Spend_Billions',
-                        size='Shoppers_Millions',
-                        hover_name='Country',
-                        color=color_col,
-                        color_continuous_scale=color_scale,
-                        title='LPI Score vs E-commerce Market Size',
-                        labels={
-                            'LPI Score': 'LPI Score (1-5)',
-                            'Spend_Billions': 'Market Size ($B)',
-                            'Shoppers_Millions': 'Shoppers (M)',
-                            'Business Region': 'Business Region',
-                            'World Bank Region': 'World Bank Region'
-                        }
-                    )
-                    fig_scatter.update_layout(height=600)
-                    st.plotly_chart(fig_scatter, use_container_width=True)
+                st.info(f"""
+                **💡 {selected_scatter_region} Insights**:
+                - Average LPI Score: **{region_avg_lpi:.2f}**
+                - Average Market Size: **${region_avg_market:.1f}B**
+                - Countries analyzed: **{len(merged_data_filtered)}**
                 
-                with tab2:
-                    # Create a formatted table view
-                    table_cols = ['Country', 'LPI Score', 'Spend_Billions', 'Shoppers_Millions']
-                    # Re-check Business Region column after filtering
-                    br_col_for_table = None
-                    if 'Business Region' in merged_data.columns:
-                        br_col_for_table = 'Business Region'
-                    elif 'Business_Region' in merged_data.columns:
-                        br_col_for_table = 'Business_Region'
-                    
-                    if br_col_for_table:
-                        table_cols.insert(1, br_col_for_table)
-                    if 'World Bank Region' in merged_data.columns:
-                        insert_idx = 2 if br_col_for_table else 1
-                        table_cols.insert(insert_idx, 'World Bank Region')
-                    
-                    display_data = merged_data[table_cols].copy()
-                    display_data = display_data.sort_values('LPI Score', ascending=False)
-                    display_data['LPI Score'] = display_data['LPI Score'].apply(lambda x: f"{x:.2f}")
-                    display_data['Spend_Billions'] = display_data['Spend_Billions'].apply(lambda x: format_number_with_commas(x, 'B'))
-                    display_data['Shoppers_Millions'] = display_data['Shoppers_Millions'].apply(lambda x: format_number_with_commas(x, 'M'))
-                    
-                    # Rename columns for display (already using 'Business Region' if business_region_col is set)
-                    col_rename = {'Country': 'Country', 'LPI Score': 'LPI Score', 'Spend_Billions': 'Market Size ($B)', 'Shoppers_Millions': 'Shoppers (M)'}
-                    if 'World Bank Region' in display_data.columns:
-                        col_rename['World Bank Region'] = 'World Bank Region'
-                    display_data.columns = [col_rename.get(col, col) for col in display_data.columns]
-                    
-                    # Style the dataframe
-                    st.dataframe(
-                        display_data,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=600
-                    )
-                
+                Strong correlation between LPI scores and market size suggests that better logistics 
+                infrastructure supports larger e-commerce markets.
+                """)
+            else:
                 st.info("""
                 **💡 Key Insight**: Strong correlation between LPI scores and market size suggests that
                 better logistics infrastructure supports larger e-commerce markets. Countries with higher
                 LPI scores typically have more efficient supply chains and faster delivery times.
                 """)
-            else:
-                st.warning("No data available for the selected Business Region.")
+        else:
+            st.warning("No data available for the selected region filter.")
         
         st.markdown("---")
         
         # Full data table
         st.subheader("📋 Complete LPI Data")
         
-        display_cols = ['Country']
-        
-        # Add region columns if available (check for 'Business Region' with space first, then 'Business_Region' with underscore)
-        if 'Business Region' in lpi_filtered.columns:
-            display_cols.append('Business Region')
-        elif 'Business_Region' in lpi_filtered.columns:
-            display_cols.append('Business_Region')
-        if 'World Bank Region' in lpi_filtered.columns:
-            display_cols.append('World Bank Region')
-        if 'ISO2' in lpi_filtered.columns:
-            display_cols.append('ISO2')
-        
-        # Add LPI scores
-        display_cols.extend(['LPI Score', 'LPI Grouped Rank', 
+        display_cols = ['Country', 'Business Region', 'World Bank Region', 'ISO2',
+                       'LPI Score', 'LPI Grouped Rank', 
                        'Customs Score', 'Infrastructure Score', 'International Shipments Score',
                        'Logistics Competence and Quality Score', 'Timeliness Score', 
-                       'Tracking and Tracing Score'])
-        
-        # Only include columns that exist
-        display_cols = [col for col in display_cols if col in lpi_filtered.columns]
+                       'Tracking and Tracing Score']
         
         lpi_table = lpi_filtered[display_cols].sort_values('LPI Score', ascending=False).reset_index(drop=True)
         
         st.dataframe(
-            lpi_table,
+            lpi_table.style.background_gradient(subset=['LPI Score'], cmap='RdYlGn', vmin=1, vmax=5),
             use_container_width=True,
             height=400
         )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Data Source**: Global E-commerce Market Research 2025")
+st.sidebar.markdown("**Last Updated**: December 2024")
