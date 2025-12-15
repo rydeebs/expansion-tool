@@ -1584,9 +1584,11 @@ with tab8:
         
         # Merge LPI data with market data
         # Always include Business_Region from df_filtered since we know it's there
-        merge_cols = ['Country', 'Spend_Billions', 'Shoppers_Millions']
-        if 'Business_Region' in df_filtered.columns:
-            merge_cols.append('Business_Region')
+        merge_cols = ['Country', 'Spend_Billions', 'Shoppers_Millions', 'Business_Region']
+        
+        # Only include Business_Region if it exists in df_filtered
+        if 'Business_Region' not in df_filtered.columns:
+            merge_cols.remove('Business_Region')
         
         # Merge LPI data with market data (including Business_Region)
         merged_data = pd.merge(
@@ -1595,6 +1597,11 @@ with tab8:
             on='Country',
             how='inner'
         )
+        
+        # Ensure Business_Region is present - if not, add it from df_filtered
+        if 'Business_Region' not in merged_data.columns and 'Business_Region' in df_filtered.columns:
+            region_map = df_filtered[['Country', 'Business_Region']].drop_duplicates(subset=['Country'])
+            merged_data = merged_data.merge(region_map, on='Country', how='left')
         
         if len(merged_data) > 0:
             # Business Region filter - always show if Business_Region column exists and has values
@@ -1613,28 +1620,6 @@ with tab8:
                     # Filter by selected region
                     if selected_lpi_region != 'All':
                         merged_data = merged_data[merged_data['Business_Region'] == selected_lpi_region].copy()
-                else:
-                    # If all values are NaN, try to get Business_Region from df_filtered
-                    if 'Business_Region' in df_filtered.columns:
-                        region_map = df_filtered[['Country', 'Business_Region']].drop_duplicates(subset=['Country'])
-                        merged_data = merged_data.merge(region_map, on='Country', how='left', suffixes=('', '_new'))
-                        # Use the new Business_Region column if it was created
-                        if 'Business_Region_new' in merged_data.columns:
-                            merged_data['Business_Region'] = merged_data['Business_Region_new']
-                            merged_data = merged_data.drop(columns=['Business_Region_new'])
-                        
-                        # Try again to show filter
-                        unique_regions = merged_data['Business_Region'].dropna().unique().tolist()
-                        if len(unique_regions) > 0:
-                            available_regions = ['All'] + sorted(unique_regions)
-                            selected_lpi_region = st.selectbox(
-                                "Filter by Business Region",
-                                available_regions,
-                                key='lpi_region_filter'
-                            )
-                            
-                            if selected_lpi_region != 'All':
-                                merged_data = merged_data[merged_data['Business_Region'] == selected_lpi_region].copy()
             
             if len(merged_data) > 0:
                 # Add tabs for different views
