@@ -137,25 +137,39 @@ def load_data():
     
     return df
 
+# Load LPI Metrics data
+@st.cache_data
+def load_lpi_data():
+    """Load and clean LPI Metrics data"""
+    lpi_df = pd.read_csv('LPI_Metrics.csv')
+    
+    # Clean column names - remove extra spaces
+    lpi_df.columns = lpi_df.columns.str.strip()
+    
+    # Rename 'Economy' to 'Country' for consistency
+    lpi_df = lpi_df.rename(columns={'Economy': 'Country'})
+    
+    return lpi_df
+
 # Function to create PDF export
 def create_pdf_report(df_export, selected_countries_list):
     """Create a comprehensive PDF report with all tabs"""
-   
+    
     if not PDF_AVAILABLE:
         return None
-   
+    
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        topMargin=0.75*inch,
+        buffer, 
+        pagesize=letter, 
+        topMargin=0.75*inch, 
         bottomMargin=0.75*inch,
         leftMargin=0.75*inch,
         rightMargin=0.75*inch
     )
     styles = getSampleStyleSheet()
     story = []
-   
+    
     # Brand colors
     cobalt = colors.HexColor('#175CFF')
     denim = colors.HexColor('#0A083B')
@@ -166,7 +180,7 @@ def create_pdf_report(df_export, selected_countries_list):
     canary = colors.HexColor('#FFD61A')
     dark_ash = colors.HexColor('#999999')
     cloud = colors.HexColor('#E8E8E8')
-   
+    
     # Custom styles with Neurial Grotesk (fallback to Helvetica)
     # H1 - 60pt Bold
     h1_style = ParagraphStyle(
@@ -179,7 +193,7 @@ def create_pdf_report(df_export, selected_countries_list):
         spaceAfter=30,
         alignment=TA_CENTER
     )
-   
+    
     # H2 - 50pt Medium
     h2_style = ParagraphStyle(
         'H2',
@@ -191,7 +205,7 @@ def create_pdf_report(df_export, selected_countries_list):
         spaceAfter=24,
         spaceBefore=24
     )
-   
+    
     # H3 - 40pt Medium
     h3_style = ParagraphStyle(
         'H3',
@@ -203,7 +217,7 @@ def create_pdf_report(df_export, selected_countries_list):
         spaceAfter=20,
         spaceBefore=20
     )
-   
+    
     # H4 - 24pt Medium
     h4_style = ParagraphStyle(
         'H4',
@@ -215,7 +229,7 @@ def create_pdf_report(df_export, selected_countries_list):
         spaceAfter=16,
         spaceBefore=16
     )
-   
+    
     # H5 - 20pt Bold
     h5_style = ParagraphStyle(
         'H5',
@@ -227,7 +241,7 @@ def create_pdf_report(df_export, selected_countries_list):
         spaceAfter=12,
         spaceBefore=12
     )
-   
+    
     # H6 - 11pt Bold
     h6_style = ParagraphStyle(
         'H6',
@@ -238,7 +252,7 @@ def create_pdf_report(df_export, selected_countries_list):
         textColor=dark_ash,
         spaceAfter=8
     )
-   
+    
     # Body text - 15pt
     body_style = ParagraphStyle(
         'Body',
@@ -248,13 +262,13 @@ def create_pdf_report(df_export, selected_countries_list):
         leading=22,
         textColor=light_denim
     )
-   
+    
     # Title Page
     story.append(Spacer(1, 1*inch))
     story.append(Paragraph("International E-commerce", h1_style))
     story.append(Paragraph("Market Analysis Report", h2_style))
     story.append(Spacer(1, 0.5*inch))
-   
+    
     # Add a colored line separator
     from reportlab.graphics.shapes import Drawing, Line
     d = Drawing(6*inch, 3)
@@ -264,21 +278,21 @@ def create_pdf_report(df_export, selected_countries_list):
     d.add(line)
     story.append(d)
     story.append(Spacer(1, 0.3*inch))
-   
+    
     country_list = ", ".join(selected_countries_list) if len(selected_countries_list) <= 5 else f"{len(selected_countries_list)} countries selected"
     story.append(Paragraph(f"<b>Selected Markets:</b> {country_list}", body_style))
     story.append(Paragraph(f"<b>Report Generated:</b> {datetime.now().strftime('%B %d, %Y at %H:%M')}", body_style))
     story.append(Spacer(1, 0.2*inch))
-   
+    
     # ShipBob branding
     story.append(Paragraph("Powered by ShipBob International Expansion Tool", h6_style))
-   
+    
     story.append(PageBreak())
-   
+    
     # Executive Summary
     story.append(Paragraph("Executive Summary", h3_style))
     story.append(Spacer(1, 0.2*inch))
-   
+    
     summary_data = [
         ['Metric', 'Value'],
         ['Total E-commerce Shoppers', f"{df_export['Shoppers_Millions'].sum():.1f}M"],
@@ -286,7 +300,7 @@ def create_pdf_report(df_export, selected_countries_list):
         ['Average Revenue per Shopper', f"${df_export['Revenue_Per_Shopper'].mean():.0f}"],
         ['Average YoY Growth Rate', f"{df_export['Spend_YoY'].mean():.1f}%"]
     ]
-   
+    
     summary_table = Table(summary_data, colWidths=[3.5*inch, 2.5*inch])
     summary_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), cobalt),
@@ -304,13 +318,13 @@ def create_pdf_report(df_export, selected_countries_list):
     ]))
     story.append(summary_table)
     story.append(PageBreak())
-   
+    
     # Top Markets Table
     story.append(Paragraph("Top Markets by Total Spend", h4_style))
     story.append(Spacer(1, 0.2*inch))
-   
+    
     top_markets = df_export.nlargest(10, 'Spend_Billions')[['Country', 'Spend_Billions', 'Shoppers_Millions', 'Revenue_Per_Shopper', 'Spend_YoY']]
-   
+    
     table_data = [['Country', 'Market Size', 'Shoppers', 'AOV', 'Growth']]
     for idx, row in top_markets.iterrows():
         table_data.append([
@@ -320,7 +334,7 @@ def create_pdf_report(df_export, selected_countries_list):
             f"${row['Revenue_Per_Shopper']:.0f}",
             f"{row['Spend_YoY']:.1f}%"
         ])
-   
+    
     markets_table = Table(table_data, colWidths=[1.8*inch, 1.2*inch, 1.1*inch, 1.0*inch, 1.0*inch])
     markets_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), cobalt),
@@ -337,18 +351,18 @@ def create_pdf_report(df_export, selected_countries_list):
     ]))
     story.append(markets_table)
     story.append(PageBreak())
-   
+    
     # Market Segmentation
     story.append(Paragraph("Market Segmentation by Region", h4_style))
     story.append(Spacer(1, 0.2*inch))
-   
+    
     region_summary = df_export.groupby('Business_Region').agg({
         'Spend_Billions': 'sum',
         'Shoppers_Millions': 'sum',
         'Country': 'count'
     }).reset_index()
     region_summary = region_summary.sort_values('Spend_Billions', ascending=False)
-   
+    
     region_data = [['Business Region', 'Total Spend', 'Total Shoppers', 'Countries']]
     for _, row in region_summary.iterrows():
         region_data.append([
@@ -357,7 +371,7 @@ def create_pdf_report(df_export, selected_countries_list):
             f"{row['Shoppers_Millions']:.1f}M",
             str(row['Country'])
         ])
-   
+    
     region_table = Table(region_data, colWidths=[2.2*inch, 1.6*inch, 1.6*inch, 1.0*inch])
     region_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), sky),
@@ -374,15 +388,15 @@ def create_pdf_report(df_export, selected_countries_list):
     ]))
     story.append(region_table)
     story.append(PageBreak())
-   
+    
     # Shopper Growth Analysis
     story.append(Paragraph("Shopper Growth Analysis", h4_style))
     story.append(Spacer(1, 0.15*inch))
-   
+    
     story.append(Paragraph(f"Total E-commerce Shoppers: <b>{df_export['Shoppers_Millions'].sum():.1f}M</b>", body_style))
     story.append(Paragraph(f"Average Shopper Growth Rate: <b>{df_export['Shoppers_YoY'].mean():.1f}%</b>", body_style))
     story.append(Spacer(1, 0.2*inch))
-   
+    
     story.append(Paragraph("Fastest Growing Markets", h5_style))
     top_growth = df_export.nlargest(10, 'Shoppers_YoY')[['Country', 'Shoppers_YoY', 'Shoppers_Millions']]
     growth_data = [['Country', 'Growth Rate', 'Current Shoppers']]
@@ -392,7 +406,7 @@ def create_pdf_report(df_export, selected_countries_list):
             f"{row['Shoppers_YoY']:.1f}%",
             f"{row['Shoppers_Millions']:.1f}M"
         ])
-   
+    
     growth_table = Table(growth_data, colWidths=[2.5*inch, 1.5*inch, 1.8*inch])
     growth_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), carrot),
@@ -409,19 +423,19 @@ def create_pdf_report(df_export, selected_countries_list):
     ]))
     story.append(growth_table)
     story.append(PageBreak())
-   
+    
     # Payment Methods Analysis
     story.append(Paragraph("Payment Method Preferences", h4_style))
     story.append(Paragraph("Critical for checkout optimization and reducing cart abandonment", body_style))
     story.append(Spacer(1, 0.2*inch))
-   
+    
     # Top BNPL markets
     story.append(Paragraph("Top Buy Now Pay Later (BNPL) Markets", h5_style))
     top_bnpl = df_export.nlargest(5, 'Payment_BNPL')[['Country', 'Payment_BNPL']]
     bnpl_data = [['Country', 'BNPL Share']]
     for _, row in top_bnpl.iterrows():
         bnpl_data.append([row['Country'], f"{row['Payment_BNPL']:.1f}%"])
-   
+    
     bnpl_table = Table(bnpl_data, colWidths=[3.5*inch, 2*inch])
     bnpl_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), canary),
@@ -438,17 +452,17 @@ def create_pdf_report(df_export, selected_countries_list):
     ]))
     story.append(bnpl_table)
     story.append(Spacer(1, 0.3*inch))
-   
+    
     # Top A2A markets - Critical warning
     story.append(Paragraph("⚠️ Account-to-Account (A2A) Transfer Markets", h5_style))
     story.append(Paragraph("<b>Critical:</b> Markets with high A2A usage require bank transfer support", body_style))
     story.append(Spacer(1, 0.1*inch))
-   
+    
     top_a2a = df_export.nlargest(5, 'Payment_A2A')[['Country', 'Payment_A2A']]
     a2a_data = [['Country', 'A2A Share']]
     for _, row in top_a2a.iterrows():
         a2a_data.append([row['Country'], f"{row['Payment_A2A']:.1f}%"])
-   
+    
     a2a_table = Table(a2a_data, colWidths=[3.5*inch, 2*inch])
     a2a_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#FF4444')),
@@ -465,22 +479,22 @@ def create_pdf_report(df_export, selected_countries_list):
     ]))
     story.append(a2a_table)
     story.append(PageBreak())
-   
+    
     # Product Categories
     story.append(Paragraph("Product Category Analysis", h4_style))
     story.append(Paragraph("Top markets by category spend", body_style))
     story.append(Spacer(1, 0.2*inch))
-   
-    category_cols_pdf = ['Fashion', 'Food', 'Furniture', 'Electronics', 'Beverages']
+    
+    category_cols = ['Fashion', 'Food', 'Furniture', 'Electronics', 'Beverages']
     category_colors = [cobalt, sky, carrot, canary, colors.HexColor('#9B59B6')]
-   
-    for idx, category in enumerate(category_cols_pdf):
+    
+    for idx, category in enumerate(category_cols):
         story.append(Paragraph(f"{category}", h5_style))
         top_cat = df_export.nlargest(5, category)[['Country', category]]
         cat_data = [['Country', 'Spend']]
         for _, row in top_cat.iterrows():
             cat_data.append([row['Country'], f"${row[category]:.1f}B"])
-       
+        
         cat_table = Table(cat_data, colWidths=[3.5*inch, 2*inch])
         cat_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), category_colors[idx]),
@@ -497,13 +511,13 @@ def create_pdf_report(df_export, selected_countries_list):
         ]))
         story.append(cat_table)
         story.append(Spacer(1, 0.15*inch))
-   
+    
     # Footer on last page
     story.append(PageBreak())
     story.append(Spacer(1, 2*inch))
     story.append(Paragraph("End of Report", h3_style))
     story.append(Spacer(1, 0.2*inch))
-   
+    
     # Add separator line
     from reportlab.graphics.shapes import Drawing, Line
     d2 = Drawing(6*inch, 3)
@@ -513,39 +527,17 @@ def create_pdf_report(df_export, selected_countries_list):
     d2.add(line2)
     story.append(d2)
     story.append(Spacer(1, 0.2*inch))
-   
+    
     story.append(Paragraph(f"Generated on {datetime.now().strftime('%B %d, %Y at %H:%M')}", h6_style))
     story.append(Paragraph("Powered by ShipBob International Expansion Tool", h6_style))
-   
+    
     # Build PDF
     doc.build(story)
     buffer.seek(0)
     return buffer
 
 df = load_data()
-
-# Helper function to format numbers with commas
-def format_number_with_commas(value, suffix=''):
-    """Format numbers with commas for values > 1000"""
-    if pd.isna(value):
-        return 'N/A'
-    
-    # Convert to float first
-    num_value = float(value)
-    
-    # If the number is >= 1000, format with commas
-    if num_value >= 1000:
-        # Format with 1 decimal place if it's not a whole number
-        if num_value == int(num_value):
-            return f"{int(num_value):,}{suffix}"
-        else:
-            return f"{num_value:,.1f}{suffix}"
-    else:
-        # For numbers < 1000, just format normally
-        if num_value == int(num_value):
-            return f"{int(num_value)}{suffix}"
-        else:
-            return f"{num_value:.1f}{suffix}"
+lpi_df = load_lpi_data()
 
 # Title
 st.title("🌍 International E-commerce Market Expansion Tool")
@@ -570,13 +562,6 @@ selected_countries = st.sidebar.multiselect(
     default=available_countries  # Show all countries by default
 )
 
-# Category filter
-category_cols_list = ['All', 'Fashion', 'Food', 'Furniture', 'Electronics', 'Beverages', 
-                     'Beauty & Personal Care', 'DIY & Hardware', 'Toys & Hobby', 
-                     'Tobacco', 'Household Essentials', 'OTC Pharmaceuticals', 
-                     'Eyewear', 'Physical Media']
-selected_category = st.sidebar.selectbox("Product Category", category_cols_list)
-
 # Filter dataframe
 if selected_region != 'All':
     df_filtered = df[df['Business_Region'] == selected_region].copy()
@@ -586,9 +571,30 @@ else:
 if selected_countries:
     df_filtered = df_filtered[df_filtered['Country'].isin(selected_countries)]
 
-# Apply category filter - only show countries with data in selected category
-if selected_category != 'All':
-    df_filtered = df_filtered[df_filtered[selected_category].notna() & (df_filtered[selected_category] > 0)]
+# Export button
+st.sidebar.markdown("---")
+st.sidebar.subheader("📄 Export Report")
+
+# Debug: Show if PDF libraries are available
+st.sidebar.write(f"PDF_AVAILABLE: {PDF_AVAILABLE}")
+
+if PDF_AVAILABLE:
+    if st.sidebar.button("Generate PDF Report", type="primary", use_container_width=True):
+        with st.spinner("Generating PDF report..."):
+            pdf_buffer = create_pdf_report(df_filtered, selected_countries if selected_countries else df_filtered['Country'].tolist())
+            
+            if pdf_buffer:
+                st.sidebar.download_button(
+                    label="📥 Download PDF",
+                    data=pdf_buffer,
+                    file_name=f"market_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+                st.sidebar.success("✅ PDF generated successfully!")
+else:
+    st.sidebar.warning("⚠️ PDF export requires: pip install reportlab kaleido")
+    st.sidebar.info("Run this in your terminal and restart the app.")
 
 # Product category columns
 category_cols = ['Fashion', 'Food', 'Furniture', 'Electronics', 'Beverages', 
@@ -606,14 +612,15 @@ motivator_cols = ['Motivator_Free_Delivery', 'Motivator_Next_Day', 'Motivator_Co
                  'Motivator_Guest_Checkout', 'Motivator_Click_Collect']
 
 # Create tabs based on Row 2 categories
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "📊 Summary", 
     "🌐 Market Segmentation",
     "👥 Shopper Growth", 
     "💰 Revenue Metrics",
     "🛍️ Product Categories",
     "💳 Payment Methods",
-    "⭐ Purchase Motivators"
+    "⭐ Purchase Motivators",
+    "📦 LPI Metrics"
 ])
 
 # TAB 1: SUMMARY
@@ -624,15 +631,11 @@ with tab1:
     
     with col1:
         total_shoppers = df_filtered['Shoppers_Millions'].sum()
-        # Format with commas if > 1000
-        shoppers_str = format_number_with_commas(total_shoppers, 'M')
-        st.metric("Total Shoppers", shoppers_str)
+        st.metric("Total Shoppers", f"{total_shoppers:.1f}M")
     
     with col2:
         total_spend = df_filtered['Spend_Billions'].sum()
-        # Format with commas if > 1000
-        spend_str = format_number_with_commas(total_spend, 'B')
-        st.metric("Total Market Size", f"${spend_str}")
+        st.metric("Total Market Size", f"${total_spend:.1f}B")
     
     with col3:
         avg_revenue = df_filtered['Revenue_Per_Shopper'].mean()
@@ -649,11 +652,11 @@ with tab1:
     
     top_markets = df_filtered.nlargest(10, 'Spend_Billions')[['Country', 'Spend_Billions', 'Shoppers_Millions', 'Revenue_Per_Shopper', 'Spend_YoY']]
     top_markets_display = top_markets.copy()
-    top_markets_display['Spend_Billions'] = top_markets_display['Spend_Billions'].apply(lambda x: f"${format_number_with_commas(x, 'B')}")
-    top_markets_display['Shoppers_Millions'] = top_markets_display['Shoppers_Millions'].apply(lambda x: f"{format_number_with_commas(x, 'M')}")
+    top_markets_display['Spend_Billions'] = top_markets_display['Spend_Billions'].apply(lambda x: f"${x:.1f}B")
+    top_markets_display['Shoppers_Millions'] = top_markets_display['Shoppers_Millions'].apply(lambda x: f"{x:.1f}M")
     top_markets_display['Revenue_Per_Shopper'] = top_markets_display['Revenue_Per_Shopper'].apply(lambda x: f"${x:.0f}")
     top_markets_display['Spend_YoY'] = top_markets_display['Spend_YoY'].apply(lambda x: f"{x:.1f}%")
-    top_markets_display.columns = ['Country', 'Market Size', 'Shoppers', 'Avg Revenue/Shopper', 'Growth']
+    top_markets_display.columns = ['Country', 'Market Size', 'Shoppers', 'AOV', 'Growth']
     
     st.dataframe(top_markets_display, use_container_width=True, hide_index=True)
 
@@ -943,13 +946,8 @@ with tab4:
 with tab5:
     st.header("Product Category Analysis")
     
-    # Category selector synced with sidebar selection
-    default_cat_index = category_cols.index(selected_category) if selected_category in category_cols else 0
-    selected_category_tab = st.selectbox(
-        "Select Category to Analyze",
-        category_cols,
-        index=default_cat_index
-    )
+    # Category selector
+    selected_category = st.selectbox("Select Category to Analyze", category_cols)
     
     st.markdown("---")
     
@@ -957,19 +955,19 @@ with tab5:
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader(f"Top Markets for {selected_category_tab}")
+        st.subheader(f"Top Markets for {selected_category}")
         
-        top_category = df_filtered.nlargest(15, selected_category_tab)[['Country', selected_category_tab, 'Spend_Billions']]
+        top_category = df_filtered.nlargest(15, selected_category)[['Country', selected_category, 'Spend_Billions']]
         
         fig_cat = px.bar(
             top_category,
-            x=selected_category_tab,
+            x=selected_category,
             y='Country',
             orientation='h',
-            text=selected_category_tab,
+            text=selected_category,
             color='Spend_Billions',
             color_continuous_scale='Viridis',
-            labels={selected_category_tab: f'{selected_category_tab} Spend ($B)', 'Spend_Billions': 'Total Market Size ($B)'}
+            labels={selected_category: f'{selected_category} Spend ($B)', 'Spend_Billions': 'Total Market Size ($B)'}
         )
         fig_cat.update_traces(texttemplate='$%{text:.1f}B', textposition='outside')
         fig_cat.update_layout(height=500)
@@ -978,94 +976,50 @@ with tab5:
     with col2:
         st.subheader("Category Stats")
         
-        total_category_spend = df_filtered[selected_category_tab].sum()
+        total_category_spend = df_filtered[selected_category].sum()
         st.metric("Total Category Spend", f"${total_category_spend:.1f}B")
         
-        avg_category_spend = df_filtered[selected_category_tab].mean()
+        avg_category_spend = df_filtered[selected_category].mean()
         st.metric("Avg per Country", f"${avg_category_spend:.1f}B")
         
-        top_market = df_filtered.nlargest(1, selected_category_tab)
+        top_market = df_filtered.nlargest(1, selected_category)
         if not top_market.empty:
-            st.metric("Top Market", top_market.iloc[0]['Country'], f"${top_market.iloc[0][selected_category_tab]:.1f}B")
+            st.metric("Top Market", top_market.iloc[0]['Country'], f"${top_market.iloc[0][selected_category]:.1f}B")
     
     st.markdown("---")
     
-    # Category comparison by country - horizontal bar chart
+    # All categories heatmap
     st.subheader("Category Comparison Across Selected Markets")
     
     if len(selected_countries) > 0:
-        # Country selector - default to single country if only one is selected
-        if len(selected_countries) == 1:
-            # Automatically use the single selected country
-            selected_country_for_categories = selected_countries[0]
-        else:
-            # Show dropdown if multiple countries are selected
-            selected_country_for_categories = st.selectbox(
-                "Select Country",
-                selected_countries,
-                key="category_country_selector"
-            )
+        # Create heatmap data
+        heatmap_data = df_filtered[df_filtered['Country'].isin(selected_countries)][['Country'] + category_cols].set_index('Country')
         
-        # Get data for the selected country
-        country_data = df_filtered[df_filtered['Country'] == selected_country_for_categories]
-        
-        if not country_data.empty:
-            # Prepare data for horizontal bar chart
-            chart_data = []
-            for category_col in category_cols:
-                value = country_data[category_col].iloc[0]
-                if pd.notna(value) and value > 0:  # Only include categories with data
-                    chart_data.append({
-                        'Category': category_col,
-                        'Spend': value
-                    })
-            
-            if chart_data:
-                chart_df = pd.DataFrame(chart_data)
-                chart_df = chart_df.sort_values('Spend', ascending=True)
-                
-                # Create horizontal bar chart
-                fig_category_bar = px.bar(
-                    chart_df,
-                    x='Spend',
-                    y='Category',
-                    orientation='h',
-                    text='Spend',
-                    color='Spend',
-                    color_continuous_scale='YlOrRd',
-                    title=f'Product Category Spend for {selected_country_for_categories}',
-                    labels={'Spend': 'Spend ($B)', 'Category': 'Category'}
-                )
-                
-                fig_category_bar.update_traces(
-                    texttemplate='$%{text:.1f}B',
-                    textposition='outside'
-                )
-                
-                fig_category_bar.update_layout(
-                    height=max(500, len(chart_df) * 40),
-                    xaxis_title='Spend ($B)',
-                    yaxis_title='Category',
-                    showlegend=False
-                )
-                
-                st.plotly_chart(fig_category_bar, use_container_width=True)
+        fig_heatmap = px.imshow(
+            heatmap_data.T,
+            labels=dict(x="Country", y="Category", color="Spend ($B)"),
+            x=heatmap_data.index,
+            y=heatmap_data.columns,
+            color_continuous_scale='YlOrRd',
+            aspect='auto'
+        )
+        fig_heatmap.update_layout(height=500)
+        st.plotly_chart(fig_heatmap, use_container_width=True)
         
         st.markdown("---")
         
-        # Category mix for selected country (pie chart)
-        selected_for_mix = selected_country_for_categories
-        
-        country_data_mix = df_filtered[df_filtered['Country'] == selected_for_mix][category_cols].T
-        country_data_mix.columns = ['Spend']
-        country_data_mix = country_data_mix.reset_index()
-        country_data_mix.columns = ['Category', 'Spend']
-        country_data_mix = country_data_mix[country_data_mix['Spend'] > 0]  # Filter out zero values
-        country_data_mix = country_data_mix.sort_values('Spend', ascending=False)
-        
-        if not country_data_mix.empty:
+        # Category mix for selected country
+        if len(selected_countries) > 0:
+            selected_for_mix = st.selectbox("Select Country for Category Mix", selected_countries)
+            
+            country_data = df_filtered[df_filtered['Country'] == selected_for_mix][category_cols].T
+            country_data.columns = ['Spend']
+            country_data = country_data.reset_index()
+            country_data.columns = ['Category', 'Spend']
+            country_data = country_data.sort_values('Spend', ascending=False)
+            
             fig_pie = px.pie(
-                country_data_mix,
+                country_data,
                 values='Spend',
                 names='Category',
                 title=f'Category Mix for {selected_for_mix}'
@@ -1163,26 +1117,13 @@ with tab7:
     
     st.markdown("---")
     
-    # Motivator horizontal bar chart by Region
-    st.subheader("Purchase Motivator Importance by Region")
+    # Motivator heatmap
+    st.subheader("Purchase Motivator Importance by Country")
     
     if len(selected_countries) > 0:
-        # Get available regions from filtered data
-        available_regions = sorted(df_filtered['Business_Region'].unique().tolist())
+        motivator_data = df_filtered[df_filtered['Country'].isin(selected_countries)][['Country'] + motivator_cols].set_index('Country')
         
-        # Region selector - default to single region if only one is available
-        if len(available_regions) == 1:
-            # Automatically use the single available region
-            selected_region_for_chart = available_regions[0]
-        else:
-            # Show dropdown if multiple regions are available
-            selected_region_for_chart = st.selectbox(
-                "Select Region for Detailed Analysis",
-                available_regions,
-                key="motivator_region_selector"
-            )
-        
-        # Prepare data for horizontal bar chart
+        # Rename for display
         motivator_display_names = {
             'Motivator_Free_Delivery': 'Free Delivery',
             'Motivator_Next_Day': 'Next Day Delivery',
@@ -1196,50 +1137,18 @@ with tab7:
             'Motivator_Guest_Checkout': 'Guest Checkout',
             'Motivator_Click_Collect': 'Click & Collect'
         }
+        motivator_data.columns = [motivator_display_names.get(col, col) for col in motivator_data.columns]
         
-        # Get data for the selected region and calculate averages
-        region_data = df_filtered[df_filtered['Business_Region'] == selected_region_for_chart]
-        
-        if not region_data.empty:
-            # Calculate average importance for each motivator in the region
-            chart_data = []
-            for motivator_col in motivator_cols:
-                motivator_name = motivator_display_names.get(motivator_col, motivator_col)
-                avg_value = region_data[motivator_col].mean()
-                chart_data.append({
-                    'Motivator': motivator_name,
-                    'Importance': avg_value
-                })
-            
-            chart_df = pd.DataFrame(chart_data)
-            chart_df = chart_df.sort_values('Importance', ascending=True)
-            
-            # Create horizontal bar chart for single region
-            fig_motivator_bar = px.bar(
-                chart_df,
-                x='Importance',
-                y='Motivator',
-                orientation='h',
-                text='Importance',
-                color='Importance',
-                color_continuous_scale='RdYlGn',
-                title=f'Purchase Motivators for {selected_region_for_chart} (Average %)',
-                labels={'Importance': 'Importance (%)', 'Motivator': 'Motivator'}
-            )
-            
-            fig_motivator_bar.update_traces(
-                texttemplate='%{text:.1f}%',
-                textposition='outside'
-            )
-            
-            fig_motivator_bar.update_layout(
-                height=max(500, len(chart_df) * 40),
-                xaxis_title='Importance (%)',
-                yaxis_title='Motivator',
-                showlegend=False
-            )
-            
-            st.plotly_chart(fig_motivator_bar, use_container_width=True)
+        fig_motivator_heat = px.imshow(
+            motivator_data.T,
+            labels=dict(x="Country", y="Motivator", color="Importance (%)"),
+            x=motivator_data.index,
+            y=motivator_data.columns,
+            color_continuous_scale='RdYlGn',
+            aspect='auto'
+        )
+        fig_motivator_heat.update_layout(height=600)
+        st.plotly_chart(fig_motivator_heat, use_container_width=True)
     
     st.markdown("---")
     
@@ -1284,26 +1193,269 @@ with tab7:
             
             st.success(f"💡 **Recommendation**: Focus on {top_3_motivators.iloc[0]['Motivator']} to maximize conversion in {selected_for_motivator}")
 
-st.sidebar.markdown("---")
-
-# PDF Export Section
-if PDF_AVAILABLE:
-    if st.sidebar.button("Generate PDF Report", type="primary", use_container_width=True):
-        with st.spinner("Generating PDF report..."):
-            pdf_buffer = create_pdf_report(df_filtered, selected_countries if selected_countries else df_filtered['Country'].tolist())
-           
-            if pdf_buffer:
-                st.sidebar.download_button(
-                    label="📥 Download PDF",
-                    data=pdf_buffer,
-                    file_name=f"market_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True
-                )
-                st.sidebar.success("✅ PDF generated successfully!")
-else:
-    st.sidebar.warning("⚠️ PDF export requires: pip install reportlab kaleido")
-    st.sidebar.info("Run this in your terminal and restart the app.")
+# TAB 8: LPI METRICS
+with tab8:
+    st.header("📦 Logistics Performance Index (LPI) Metrics")
+    
+    st.markdown("""
+    The **Logistics Performance Index (LPI)** is a World Bank metric that measures logistics performance across countries.
+    Higher scores indicate better logistics infrastructure and efficiency (scale: 1-5).
+    """)
+    
+    # Filter LPI data to only countries in our main dataset
+    lpi_filtered = lpi_df[lpi_df['Country'].isin(df_filtered['Country'])].copy()
+    
+    if len(lpi_filtered) == 0:
+        st.warning("No LPI data available for selected countries")
+    else:
+        # Key Metrics
+        st.subheader("📊 Overall LPI Performance")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            avg_lpi = lpi_filtered['LPI Score'].mean()
+            st.metric("Average LPI Score", f"{avg_lpi:.2f}")
+        
+        with col2:
+            top_performer = lpi_filtered.nlargest(1, 'LPI Score')
+            st.metric("Top Performer", f"{top_performer['Country'].values[0]}")
+        
+        with col3:
+            best_customs = lpi_filtered.nlargest(1, 'Customs Score')
+            st.metric("Best Customs", f"{best_customs['Country'].values[0]}")
+        
+        with col4:
+            best_timeliness = lpi_filtered.nlargest(1, 'Timeliness Score')
+            st.metric("Best Timeliness", f"{best_timeliness['Country'].values[0]}")
+        
+        st.markdown("---")
+        
+        # Overall LPI Ranking
+        st.subheader("🏆 Overall LPI Rankings")
+        
+        # Top 15 countries by LPI Score
+        top_lpi = lpi_filtered.nlargest(15, 'LPI Score')
+        
+        fig_lpi_bar = px.bar(
+            top_lpi,
+            y='Country',
+            x='LPI Score',
+            orientation='h',
+            title='Top 15 Countries by LPI Score',
+            labels={'LPI Score': 'LPI Score (1-5)', 'Country': ''},
+            color='LPI Score',
+            color_continuous_scale='RdYlGn',
+            text='LPI Score'
+        )
+        fig_lpi_bar.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+        fig_lpi_bar.update_layout(height=600, showlegend=False)
+        st.plotly_chart(fig_lpi_bar, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # LPI Components Breakdown
+        st.subheader("📈 LPI Components Analysis")
+        
+        st.markdown("""
+        LPI is composed of 6 key components:
+        1. **Customs** - Efficiency of customs clearance
+        2. **Infrastructure** - Quality of trade and transport infrastructure
+        3. **International Shipments** - Ease of arranging competitively priced shipments
+        4. **Logistics Competence** - Competence and quality of logistics services
+        5. **Timeliness** - Frequency of shipments reaching consignee within scheduled time
+        6. **Tracking & Tracing** - Ability to track and trace consignments
+        """)
+        
+        # Radar chart for selected country comparison
+        st.subheader("🎯 Country LPI Component Comparison")
+        
+        # Country selector
+        lpi_countries_list = lpi_filtered.nlargest(20, 'LPI Score')['Country'].tolist()
+        selected_lpi_countries = st.multiselect(
+            "Select countries to compare (up to 5)",
+            lpi_countries_list,
+            default=lpi_countries_list[:3],
+            max_selections=5
+        )
+        
+        if selected_lpi_countries:
+            # Create radar chart
+            lpi_components = ['Customs Score', 'Infrastructure Score', 'International Shipments Score',
+                             'Logistics Competence and Quality Score', 'Timeliness Score', 'Tracking and Tracing Score']
+            
+            fig_radar = go.Figure()
+            
+            for country in selected_lpi_countries:
+                country_data = lpi_filtered[lpi_filtered['Country'] == country]
+                if len(country_data) > 0:
+                    values = [country_data[comp].values[0] for comp in lpi_components]
+                    
+                    fig_radar.add_trace(go.Scatterpolar(
+                        r=values,
+                        theta=['Customs', 'Infrastructure', 'Intl Shipments', 'Competence', 'Timeliness', 'Tracking'],
+                        fill='toself',
+                        name=country
+                    ))
+            
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(
+                        visible=True,
+                        range=[0, 5]
+                    )
+                ),
+                showlegend=True,
+                title="LPI Component Comparison by Country",
+                height=600
+            )
+            
+            st.plotly_chart(fig_radar, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Component-by-component analysis
+        st.subheader("🔍 Detailed Component Analysis")
+        
+        # Component selector
+        component_options = {
+            'Customs': 'Customs Score',
+            'Infrastructure': 'Infrastructure Score',
+            'International Shipments': 'International Shipments Score',
+            'Logistics Competence': 'Logistics Competence and Quality Score',
+            'Timeliness': 'Timeliness Score',
+            'Tracking & Tracing': 'Tracking and Tracing Score'
+        }
+        
+        selected_component = st.selectbox("Select LPI Component", list(component_options.keys()))
+        component_col = component_options[selected_component]
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Top performers for selected component
+            st.markdown(f"**Top 10 Countries - {selected_component}**")
+            top_component = lpi_filtered.nlargest(10, component_col)
+            
+            fig_component = px.bar(
+                top_component,
+                y='Country',
+                x=component_col,
+                orientation='h',
+                color=component_col,
+                color_continuous_scale='Greens',
+                text=component_col
+            )
+            fig_component.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+            fig_component.update_layout(height=500, showlegend=False)
+            st.plotly_chart(fig_component, use_container_width=True)
+        
+        with col2:
+            # Statistics for selected component
+            st.markdown(f"**{selected_component} Statistics**")
+            
+            component_stats = {
+                'Average Score': lpi_filtered[component_col].mean(),
+                'Highest Score': lpi_filtered[component_col].max(),
+                'Lowest Score': lpi_filtered[component_col].min(),
+                'Std Deviation': lpi_filtered[component_col].std()
+            }
+            
+            for stat, value in component_stats.items():
+                st.metric(stat, f"{value:.2f}")
+            
+            st.markdown("---")
+            
+            # Distribution histogram
+            fig_dist = px.histogram(
+                lpi_filtered,
+                x=component_col,
+                nbins=20,
+                title=f'{selected_component} Score Distribution',
+                labels={component_col: 'Score'},
+                color_discrete_sequence=['#175CFF']
+            )
+            fig_dist.update_layout(height=300)
+            st.plotly_chart(fig_dist, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Heatmap - All components across countries
+        st.subheader("🗺️ LPI Components Heatmap")
+        
+        # Limit to top 25 countries for readability
+        heatmap_countries = lpi_filtered.nlargest(25, 'LPI Score')
+        
+        heatmap_data = heatmap_countries[lpi_components].values
+        
+        fig_heatmap = px.imshow(
+            heatmap_data,
+            labels=dict(x="LPI Component", y="Country", color="Score"),
+            y=heatmap_countries['Country'].tolist(),
+            x=['Customs', 'Infrastructure', 'Intl Shipments', 'Competence', 'Timeliness', 'Tracking'],
+            color_continuous_scale='RdYlGn',
+            aspect='auto',
+            title='LPI Components Heatmap - Top 25 Countries'
+        )
+        fig_heatmap.update_layout(height=800)
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # Scatter plot: LPI vs Market Size
+        st.subheader("💡 LPI Score vs Market Size")
+        
+        # Merge LPI data with market data
+        merged_data = pd.merge(
+            lpi_filtered,
+            df_filtered[['Country', 'Spend_Billions', 'Shoppers_Millions']],
+            on='Country',
+            how='inner'
+        )
+        
+        if len(merged_data) > 0:
+            fig_scatter = px.scatter(
+                merged_data,
+                x='LPI Score',
+                y='Spend_Billions',
+                size='Shoppers_Millions',
+                hover_name='Country',
+                title='LPI Score vs E-commerce Market Size',
+                labels={
+                    'LPI Score': 'LPI Score (1-5)',
+                    'Spend_Billions': 'Market Size ($B)',
+                    'Shoppers_Millions': 'Shoppers (M)'
+                },
+                color='LPI Score',
+                color_continuous_scale='Viridis'
+            )
+            fig_scatter.update_layout(height=600)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            st.info("""
+            **💡 Key Insight**: Strong correlation between LPI scores and market size suggests that
+            better logistics infrastructure supports larger e-commerce markets. Countries with higher
+            LPI scores typically have more efficient supply chains and faster delivery times.
+            """)
+        
+        st.markdown("---")
+        
+        # Full data table
+        st.subheader("📋 Complete LPI Data")
+        
+        display_cols = ['Country', 'LPI Score', 'LPI Grouped Rank', 
+                       'Customs Score', 'Infrastructure Score', 'International Shipments Score',
+                       'Logistics Competence and Quality Score', 'Timeliness Score', 
+                       'Tracking and Tracing Score']
+        
+        lpi_table = lpi_filtered[display_cols].sort_values('LPI Score', ascending=False).reset_index(drop=True)
+        
+        st.dataframe(
+            lpi_table.style.background_gradient(subset=['LPI Score'], cmap='RdYlGn', vmin=1, vmax=5),
+            use_container_width=True,
+            height=400
+        )
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Data Source**: Global E-commerce Market Research 2025")
+st.sidebar.markdown("**Last Updated**: December 2024")
