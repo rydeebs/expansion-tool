@@ -1583,46 +1583,70 @@ with tab8:
         st.subheader("💡 LPI Score vs Market Size")
         
         # Merge LPI data with market data
+        # First, ensure Business_Region is available from either source
+        merge_cols = ['Country', 'Spend_Billions', 'Shoppers_Millions']
+        if 'Business_Region' in df_filtered.columns:
+            merge_cols.append('Business_Region')
+        
         merged_data = pd.merge(
             lpi_filtered,
-            df_filtered[['Country', 'Spend_Billions', 'Shoppers_Millions', 'Business_Region']],
+            df_filtered[merge_cols],
             on='Country',
             how='inner'
         )
         
+        # If Business_Region wasn't in df_filtered, try to get it from lpi_filtered
+        if 'Business_Region' not in merged_data.columns and 'Business_Region' in lpi_filtered.columns:
+            merged_data = merged_data.merge(
+                lpi_filtered[['Country', 'Business_Region']],
+                on='Country',
+                how='left'
+            )
+        
         if len(merged_data) > 0:
-            # Business Region filter
+            # Business Region filter - always show if Business_Region is available
+            selected_lpi_region = 'All'
             if 'Business_Region' in merged_data.columns:
                 available_regions = ['All'] + sorted(merged_data['Business_Region'].dropna().unique().tolist())
-                selected_lpi_region = st.selectbox(
-                    "Filter by Business Region",
-                    available_regions,
-                    key='lpi_region_filter'
-                )
-                
-                # Filter by selected region
-                if selected_lpi_region != 'All':
-                    merged_data = merged_data[merged_data['Business_Region'] == selected_lpi_region].copy()
+                if len(available_regions) > 1:  # Only show filter if there are multiple regions
+                    selected_lpi_region = st.selectbox(
+                        "Filter by Business Region",
+                        available_regions,
+                        key='lpi_region_filter'
+                    )
+                    
+                    # Filter by selected region
+                    if selected_lpi_region != 'All':
+                        merged_data = merged_data[merged_data['Business_Region'] == selected_lpi_region].copy()
             
             if len(merged_data) > 0:
                 # Add tabs for different views
                 tab1, tab2 = st.tabs(["📊 Scatter Plot", "📋 Table View"])
                 
                 with tab1:
+                    # Determine color column - use Business_Region if available and multiple regions, otherwise use LPI Score
+                    if 'Business_Region' in merged_data.columns and selected_lpi_region == 'All' and merged_data['Business_Region'].nunique() > 1:
+                        color_col = 'Business_Region'
+                        color_scale = None
+                    else:
+                        color_col = 'LPI Score'
+                        color_scale = 'Viridis'
+                    
                     fig_scatter = px.scatter(
                         merged_data,
                         x='LPI Score',
                         y='Spend_Billions',
                         size='Shoppers_Millions',
                         hover_name='Country',
+                        color=color_col,
+                        color_continuous_scale=color_scale,
                         title='LPI Score vs E-commerce Market Size',
                         labels={
                             'LPI Score': 'LPI Score (1-5)',
                             'Spend_Billions': 'Market Size ($B)',
-                            'Shoppers_Millions': 'Shoppers (M)'
-                        },
-                        color='LPI Score',
-                        color_continuous_scale='Viridis'
+                            'Shoppers_Millions': 'Shoppers (M)',
+                            'Business_Region': 'Business Region'
+                        }
                     )
                     fig_scatter.update_layout(height=600)
                     st.plotly_chart(fig_scatter, use_container_width=True)
